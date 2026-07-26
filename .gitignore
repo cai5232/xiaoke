@@ -1,0 +1,21 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime data: never publish real conversation history or captures
+data/
+!data/.gitkeep
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+
+# Generated or local-only files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+backups/
+.prepublish-backup-*/
+*.orig
+*.rej

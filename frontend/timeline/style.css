@@ -1,0 +1,111 @@
+:root{--ink:#3c3842;--muted:#8e858f;--line:rgba(218,202,199,.65);--pink:#cf7d98;--pink-bg:rgba(255,239,244,.62);--blue:#6d91c6;--blue-bg:rgba(237,246,255,.64);--gold:#a7884c;--gold-bg:rgba(255,249,226,.67);--glass:rgba(255,255,255,.47);--shadow:0 16px 42px rgba(118,91,102,.11)}*{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden;background:#fffaf4}body{margin:0;min-height:100vh;overflow-x:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);color:var(--ink);background:radial-gradient(ellipse at 11% 34%,rgba(245,196,214,.42),transparent 26rem),radial-gradient(ellipse at 91% 50%,rgba(188,218,251,.38),transparent 29rem),linear-gradient(145deg,#fffdf9,#fff8f5 43%,#f5f5ff);font-family:"Noto Serif SC","Songti SC","STSong",serif}.sky{position:fixed;inset:0;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 82% 8%,rgba(250,231,190,.44),transparent 20rem),radial-gradient(circle at 12% 80%,rgba(221,214,248,.36),transparent 26rem)}.moon{position:absolute;right:8vw;top:45px;width:68px;height:68px;border-radius:50%;background:rgba(255,249,223,.87);box-shadow:0 0 0 14px rgba(255,248,221,.22),0 10px 32px rgba(194,171,107,.16)}.moon:after{content:"";position:absolute;top:-6px;left:-12px;width:67px;height:67px;border-radius:50%;background:#fffaf5}.orb{position:absolute;border-radius:50%;filter:blur(3px);opacity:.48}.o1{width:170px;height:170px;top:28%;left:-75px;background:#f4dce8}.o2{width:120px;height:120px;right:-40px;bottom:12%;background:#dfe7fa}main{width:min(800px,100%);margin:auto;padding:calc(50px + env(safe-area-inset-top)) 20px calc(76px + env(safe-area-inset-bottom));position:relative}.hero{text-align:center;padding:9px 0 24px}.eyebrow{color:#b5899e;letter-spacing:.16em;font-size:10px;font-weight:700;margin:0 0 11px}h1{font-family:"Playfair Display","Noto Serif SC","Songti SC",serif;font-weight:500;font-size:38px;letter-spacing:.08em;margin:0;color:#504754;text-shadow:0 1px #fff}.subtitle{color:var(--muted);font-family:"Playfair Display","Noto Serif SC","Songti SC",serif;font-size:15px;letter-spacing:.025em;margin:12px 0 0}.toolbar{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:23px;flex-wrap:wrap}.filters{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}.filters button{font:inherit;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#886f79;border-radius:99px;padding:8px 14px;cursor:pointer;transition:.18s ease;box-shadow:0 3px 11px rgba(104,78,89,.04)}.filters button:hover,.filters button.active{background:rgba(224,160,181,.85);border-color:rgba(224,160,181,.9);color:#fff;box-shadow:0 6px 16px rgba(202,125,151,.17)}.filters button,.full-calendar{width:min(520px,calc(100vw - 58px));margin:0 auto 15px;padding:10px 16px 10px;background:rgba(255,253,250,.58);border:1px solid rgba(232,217,211,.82);backdrop-filter:blur(18px) saturate(135%);-webkit-backdrop-filter:blur(18px) saturate(135%);box-shadow:0 9px 25px rgba(118,91,102,.065);border-radius:18px}.month-head{display:grid;grid-template-columns:42px 1fr 42px;align-items:center;text-align:center}.month-head b{display:block;font-family:"Playfair Display","Noto Serif SC","Songti SC",serif;font-size:18px;font-weight:500;letter-spacing:.045em;color:#5c535e}.month-head small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.month-head button{width:33px;height:33px;justify-self:center;border:1px solid rgba(222,207,205,.78);border-radius:50%;background:rgba(255,255,255,.53);color:#a07989;font:400 25px/1 Georgia,serif;cursor:pointer;transition:.18s}.month-head button:hover{background:rgba(249,227,235,.82);border-color:#e8bdcc;color:#c26e8d}.weekdays,.month-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}.weekdays{margin-top:7px;color:#ae9fa5;font-size:10px}.month-grid{gap:2px;margin-top:3px}.month-grid .blank{height:32px}.month-grid button{position:relative;min-height:32px;border:0;border-radius:11px;background:transparent;color:#a79ba1;font:400 14px "Noto Serif SC","Songti SC",serif;cursor:default}.month-grid button.has-record{cursor:pointer;color:#6e626a;background:rgba(255,255,255,.35)}.month-grid button.has-record:after{content:"";position:absolute;width:4px;height:4px;left:calc(50% - 2px);bottom:3px;border-radius:50%;background:#cf91a7}.month-grid button.has-record:hover{background:rgba(248,222,232,.73);color:#b86684}.month-grid button.today{box-shadow:inset 0 0 0 1px rgba(153,182,220,.55);color:#6384b6}.reading-status{text-align:center;font-size:13px;color:var(--muted);padding:10px 0 18px;min-height:39px}.day-divider{display:flex;align-items:center;gap:12px;color:#a99ba1;font-size:12px;letter-spacing:.04em;margin:26px 4px 15px}.day-divider span{height:1px;background:var(--line);flex:1}#timeline{display:grid;grid-template-columns:minmax(0,1fr);gap:11px;min-width:0}.record{position:relative;isolation:isolate;min-width:0;width:fit-content;max-width:83%;padding:12px 15px 13px;border:1px solid rgba(255,255,255,.72);backdrop-filter:blur(20px) saturate(145%);-webkit-backdrop-filter:blur(20px) saturate(145%);box-shadow:inset 0 1px 0 rgba(255,255,255,.66),inset 0 -1px 0 rgba(255,255,255,.18),0 10px 25px rgba(88,67,77,.075);border-radius:18px;overflow:hidden}.record:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none}.record.user{justify-self:end;background:rgba(255,231,240,.43);border-color:rgba(255,243,247,.78);border-bottom-right-radius:5px}.record.user:before{background:linear-gradient(135deg,rgba(255,255,255,.34),rgba(247,181,207,.13) 62%,rgba(226,126,169,.18))}.record.assistant{justify-self:start;background:rgba(229,242,255,.43);border-color:rgba(242,249,255,.8);border-bottom-left-radius:5px}.record.assistant:before{background:linear-gradient(135deg,rgba(255,255,255,.36),rgba(180,215,249,.13) 62%,rgba(103,161,224,.17))}.record.event{justify-self:center;width:min(94%,680px);max-width:94%;background:rgba(255,245,208,.46);border-color:rgba(255,249,225,.82);border-radius:14px;text-align:center;padding:10px 15px}.record.event:before{background:linear-gradient(135deg,rgba(255,255,255,.4),rgba(244,211,111,.14))}.meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10px;letter-spacing:.025em;color:var(--muted)}.role{font-weight:700}.user .role{color:var(--pink)}.assistant .role{color:var(--blue)}.event .role{color:var(--gold)}.source{background:rgba(255,255,255,.55);padding:2px 6px;border-radius:5px;font-size:10px}.seq{margin-left:auto;opacity:.55}.content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.78;margin-top:8px;font-size:14px;font-weight:400;letter-spacing:.006em;color:#49434c;text-shadow:0 1px rgba(255,255,255,.36)}.event .content{font-size:12px;line-height:1.55;margin-top:6px}.older{display:block;margin:28px auto 0;padding:10px 19px}.older:hover,.latest:hover{border-color:#d8a7b6;background:rgba(255,248,250,.9)}.older:disabled{opacity:.55;cursor:wait}.latest{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom));top:auto!important;left:auto!important;z-index:20;box-shadow:var(--shadow);padding:10px 14px;font-size:13px;transform:translateZ(0)}@media(max-width:540px){main{padding:35px 13px 65px}h1{font-size:31px}.moon{right:4vw;top:19px;transform:scale(.75)}.hero{padding-top:5px}.record{max-width:92%;padding:11px 13px}.content{font-size:13px}.seq{display:none}.latest{right:14px;bottom:calc(14px + env(safe-area-inset-bottom))}.full-calendar{padding:11px 12px}}
+/* V29: keep the four role filters as compact horizontal pills on every viewport. */
+.toolbar{display:flex!important;justify-content:center!important;align-items:center!important;flex-wrap:nowrap!important;gap:0!important}
+.filters{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:center!important;align-items:center!important;gap:8px!important;width:auto!important;max-width:100%!important}
+.filters button{display:inline-flex!important;width:auto!important;min-width:0!important;flex:0 0 auto!important;align-items:center!important;justify-content:center!important;margin:0!important;white-space:nowrap!important}
+@media(max-width:540px){.filters{gap:7px!important}.filters button{padding:8px 13px!important}}
+.full-calendar{width:min(650px,calc(100vw - 26px))}
+
+/* Keep the floating latest button visually consistent across default/focus states. */
+.latest{
+  appearance:none;
+  -webkit-appearance:none;
+  border:1px solid rgba(216,167,182,.72);
+  border-radius:999px;
+  background:rgba(255,250,252,.82);
+  color:#9d687a;
+  font-family:inherit;
+  cursor:pointer;
+}
+.latest:focus{outline:none}
+.latest:focus-visible{
+  outline:2px solid rgba(207,125,152,.48);
+  outline-offset:3px;
+}
+.latest:active{
+  background:rgba(248,222,232,.92);
+  color:#875466;
+  transform:translateZ(0) scale(.98);
+}
+
+
+/* A compact record-count badge keeps the calendar height unchanged. */
+.month-grid button.has-record:after{display:none}
+.month-grid button .day-count{position:absolute;top:3px;right:5px;padding:0;background:transparent;color:rgba(173,132,147,.82);font:italic 500 10px/1 "Playfair Display",Georgia,serif;letter-spacing:0;text-shadow:0 1px rgba(255,255,255,.7)}
+
+
+/* Match the pagination button to the Timeline's soft controls. */
+.older{
+  appearance:none;
+  -webkit-appearance:none;
+  border:1px solid rgba(216,167,182,.72);
+  border-radius:999px;
+  background:rgba(255,250,252,.82);
+  color:#9d687a;
+  font-family:inherit;
+  cursor:pointer;
+}
+.older:focus{outline:none}
+.older:focus-visible{
+  outline:2px solid rgba(207,125,152,.48);
+  outline-offset:3px;
+}
+.older:active:not(:disabled){
+  background:rgba(248,222,232,.92);
+  color:#875466;
+  transform:scale(.98);
+}
+
+
+/* Dedicated viewport layer: the page scrolls below it, never the floating control. */
+#floating-controls{
+  position:fixed!important;
+  right:22px!important;
+  bottom:calc(22px + env(safe-area-inset-bottom))!important;
+  left:auto!important;
+  top:auto!important;
+  inset:auto 22px calc(22px + env(safe-area-inset-bottom)) auto!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+  z-index:2147483647;
+  pointer-events:none;
+}
+#floating-controls:popover-open{display:block!important;}
+#floating-controls .latest{
+  position:static!important;
+  display:block;
+  pointer-events:auto;
+}
+@media(max-width:540px){
+  #floating-controls{right:14px!important;bottom:calc(14px + env(safe-area-inset-bottom))!important}
+}
+
+/* Timeline actions: search, favorite and irreversible delete. */
+.search{width:min(520px,calc(100vw - 58px));margin:0 auto 8px;padding:5px 7px;display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:99px;background:rgba(255,253,250,.58);backdrop-filter:blur(12px)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:13px "Noto Serif SC","Songti SC",serif;padding:7px 8px}.search button{border:0;border-radius:99px;background:rgba(255,240,246,.8);color:#9d687a;font:12px inherit;padding:7px 11px}.meta .favorite,.meta .delete{border:0;background:transparent;padding:0 2px;font:17px/1 Georgia,serif;cursor:pointer;color:#b58a98}.meta .favorite.on{color:#cf7d98}.meta .delete{color:#c69a9a;font-family:-apple-system,sans-serif}.meta .favorite:focus-visible,.meta .delete:focus-visible{outline:2px solid rgba(207,125,152,.48);border-radius:5px}dialog{border:1px solid rgba(232,217,211,.9);border-radius:20px;max-width:min(420px,90vw);padding:22px;color:var(--ink);font-family:"Noto Serif SC","Songti SC",serif;box-shadow:0 20px 60px rgba(70,50,60,.28)}dialog::backdrop{background:rgba(74,53,62,.28);backdrop-filter:blur(2px)}dialog h2{font-size:19px;margin:0 0 10px}dialog p{font-size:13px;line-height:1.75;color:#6c626a;margin:0 0 17px}.dialog-actions{display:flex;justify-content:flex-end;gap:9px}.dialog-actions button{border:1px solid var(--line);border-radius:99px;padding:8px 12px;background:#fffafc;color:#806875;font:inherit}.dialog-actions #delete-confirm{background:#c97d86;color:#fff;border-color:#c97d86}@media(max-width:540px){.search{width:calc(100vw - 36px)}}
+
+/* V30: keep record actions at the bubble top right, separate from metadata. */
+.toolbar{margin-bottom:25px}
+.record .meta{padding-right:52px}
+.record-actions{position:absolute;top:9px;right:10px;z-index:2;display:flex;align-items:center;gap:4px}
+.record-actions .favorite,.record-actions .delete{border:0;background:transparent;margin:0;padding:1px 2px;min-width:18px;font:17px/1 Georgia,serif;cursor:pointer;color:#b58a98}
+.record-actions .favorite.on{color:#cf7d98}
+.record-actions .delete{color:#c69a9a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:18px}
+.record-actions .favorite:focus-visible,.record-actions .delete:focus-visible{outline:2px solid rgba(207,125,152,.48);border-radius:5px}
+@media(max-width:540px){.toolbar{margin-bottom:22px}.record .meta{padding-right:48px}.record-actions{top:8px;right:8px}}
+
+/* Prevent iOS Safaris
+
+/* Prevent iOS Safaris
+/* V31: prevent iOS Safari native blue tap-focus ring on dialog actions. */
+.dialog-actions button{-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent}
+.dialog-actions button:focus{outline:none}
+.dialog-actions button:focus-visible{outline:2px solid rgba(207,125,152,.55);outline-offset:2px}
+
+/* V31: Safari gives dialog buttons a blue native focus ring; use the page palette instead. */
+.dialog-actions button{appearance:none;-webkit-appearance:none;outline:none;-webkit-tap-highlight-color:transparent}
+.dialog-actions button:focus{outline:none;box-shadow:0 0 0 3px rgba(207,125,152,.30)}
+.dialog-actions button:focus:not(:focus-visible){box-shadow:none}
