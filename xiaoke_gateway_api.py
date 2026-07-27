@@ -276,6 +276,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                             store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
                             if baseline and not continuing:
                                 store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+                            notify_bot_replied()
 
                 return Response(generate_stream(), content_type='text/event-stream',
                               headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
