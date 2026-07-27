@@ -210,6 +210,24 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if not user_text:
             return jsonify({'error': {'message': 'an eligible current user message is required', 'type': 'invalid_request_error'}}), 400
 
+        # 通知 jiwen 用户发了消息（异步，不阻塞）
+        notify_user_message(user_text)
+
+        # 拉取 jiwen 语调指引，注入 system prompt
+        guidance = get_guidance('reactive')
+        if guidance:
+            injected_systems = []
+            found_system = False
+            for m in messages:
+                if m.get('role') == 'system' and not found_system:
+                    injected_systems.append({**m, 'content': m['content'] + '\n\n【此刻说话方式】\n' + guidance})
+                    found_system = True
+                else:
+                    injected_systems.append(m)
+            if not found_system:
+                injected_systems = [{'role': 'system', 'content': '【此刻说话方式】\n' + guidance}] + messages
+            messages = injected_systems
+
         # Window identification is frontend-specific and intentionally conservative.
         identity = identify_window(request.headers, messages, store)
         session_id = identity.session_id
