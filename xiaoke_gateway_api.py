@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from flask import Flask, Response, jsonify, request
 from mock_gateway import assemble
+from jiwen_client import get_guidance, notify_user_message, notify_bot_replied
 from storage import TimelineStore, utcnow
 from coreading import stage as coreading_stage, deliver as coreading_deliver
 from timeline_context import TimelineRecord, rolling_records, text_from_content
