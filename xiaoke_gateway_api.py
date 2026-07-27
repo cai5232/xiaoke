@@ -97,9 +97,9 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             'timeline_records': len(store.records()),
         })
 
-            @app.get('/v1/models')
-        def list_models():
-            return jsonify({"object":"list","data":[{"id":"[Kiro] claude-sonnet-4-6-thinking [不补]","object":"model","created":0,"owned_by":"xiaoke"}]})
+    @app.get('/v1/models')
+    def list_models():
+        return jsonify({"object":"list","data":[{"id":"[Kiro] claude-sonnet-4-6-thinking [不补]","object":"model","created":0,"owned_by":"xiaoke"}]})
 
     @app.get('/internal/timeline')
     def internal_timeline():
