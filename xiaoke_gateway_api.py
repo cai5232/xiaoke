@@ -103,7 +103,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             "object": "list",
             "data": [
                 {
-                     "id": "claude-sonnet-4-6-thinking",
+                     "id": "[Kiro] claude-sonnet-4-6-thinking [不补]"
                      "object": "model",
                      "created": 0,
                      "owned_by": "xiaoke"
