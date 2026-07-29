@@ -84,6 +84,7 @@ def current_user_text(messages: list[dict[str, Any]]) -> str | None:
 
 def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None = None, max_handoff_chars: int | None = None, api_key: str | None = None) -> Flask:
     app = Flask(__name__)
+    CORS(app)
     store = TimelineStore(db_path)
     max_records = max_handoff_records if max_handoff_records is not None else int(os.environ.get("MAX_HANDOFF_RECORDS", DEFAULT_HANDOFF_RECORDS))
     max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
