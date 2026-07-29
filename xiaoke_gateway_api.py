@@ -100,9 +100,24 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             'timeline_records': len(store.records()),
         })
 
-    @app.get('/v1/models')
+    @app.route('/v1/models', methods=['GET', 'OPTIONS'])
     def list_models():
-        return jsonify({"object":"list","data":[{"id":"[Kiro] claude-sonnet-4-6-thinking [不补]","object":"model","created":0,"owned_by":"xiaoke"}]})
+        if request.method == 'OPTIONS':
+            r = Response('', 204)
+            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+            r.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+            return r
+        r = jsonify({"object":"list","data":[{"id":"[Kiro] claude-sonnet-4-6-thinking [不补]","object":"model","created":0,"owned_by":"xiaoke"}]})
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        return r
+
+    @app.after_request
+    def add_cors(response):
+        response.headers.setdefault('Access-Control-Allow-Origin', '*')
+        response.headers.setdefault('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        return response
 
     @app.get('/internal/timeline')
     def internal_timeline():
