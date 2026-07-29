@@ -8,6 +8,7 @@ import hmac
 from pathlib import Path
 from typing import Any
 from flask import Flask, Response, jsonify, request
+from flask_cors import CORS
 from mock_gateway import assemble
 from jiwen_client import get_guidance, notify_user_message, notify_bot_replied
 from storage import TimelineStore, utcnow
