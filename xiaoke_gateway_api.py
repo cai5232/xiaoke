@@ -46,12 +46,6 @@ def restore_baseline(store: TimelineStore, session_id: str) -> list[TimelineReco
 
 
 def timeline_injection_messages(records: list[TimelineRecord]) -> list[dict[str, Any]]:
-    """Render shared history as ordinary prior dialogue.
-
-    Timestamps remain in SQLite for ordering, wake-up logic, and future user
-    views, but are intentionally not sent upstream. A time/header marker is
-    not needed for continuity and can leak into a model's visible reply.
-    """
     result = []
     for record in records:
         role = record.role if record.role in ('user', 'assistant') else 'assistant'
@@ -59,8 +53,6 @@ def timeline_injection_messages(records: list[TimelineRecord]) -> list[dict[str,
     return result
 
 def build_messages(messages: list[dict[str, Any]], store: TimelineStore, session_id: str | None, max_records: int, max_chars: int) -> tuple[list[dict[str, Any]], list[TimelineRecord], bool]:
-    """Build the full message list to send to model.
-    Returns (assembled_messages, baseline_records, is_continuing_session)."""
     if session_id:
         if restore_baseline(store, session_id) is not None:
             baseline = rolling_records(messages, store.records(), max_records, max_chars)
@@ -231,19 +223,18 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         # 通知 jiwen 用户发了消息（异步，不阻塞）
         notify_user_message(user_text)
 
-        # 拉取 OB breath 记忆，注入 system prompt（同步，失败静默跳过）
+        # 拉取 OB breath 记忆 + jiwen 语调指引，同时注入 system prompt
         breath_text = get_breath_memories(max_results=15)
-
-        # 拉取 jiwen 语调指引，注入 system prompt
         guidance = get_guidance('reactive')
+
         if guidance or breath_text:
-            injected_systems = []
-            found_system = False
             extra = ''
             if breath_text:
-                extra += '\n\n【长期记忆 / 关于言言的记忆】\n' + breath_text
+                extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
             if guidance:
-                extra += '\n\n【此刻说话方式】\n' + guidance
+                extra += '\n\n[此刻说话方式]\n' + guidance
+            injected_systems = []
+            found_system = False
             for m in messages:
                 if m.get('role') == 'system' and not found_system:
                     injected_systems.append({**m, 'content': m['content'] + extra})
@@ -254,33 +245,25 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 injected_systems = [{'role': 'system', 'content': extra.strip()}] + messages
             messages = injected_systems
 
-        # Window identification is frontend-specific and intentionally conservative.
+        # Window identification
         identity = identify_window(request.headers, messages, store)
         session_id = identity.session_id
         source = identity.source
-
-
-        # Kelivo keeps the search tool schema, but its duplicate usage guide is not forwarded.
 
         # Build assembled messages with timeline injection
         assembled, baseline, continuing = build_messages(messages, store, session_id, max_records, max_chars)
         model = str(body.get('model') or 'claude-opus-4-6-thinking')
         is_stream = body.get('stream', False)
-        # xiaoke owns rebuilt messages/model/stream. Preserve all other
-        # OpenAI-compatible options, including tools and tool_choice.
         request_options = {key: value for key, value in body.items()
                            if key not in ('messages', 'model', 'stream')}
 
         if has_upstream():
-            # Real upstream forwarding
             from upstream import forward_non_stream, forward_stream, extract_stream_content, request_payload
 
-            # Clean assembled messages: remove xiaoke_record_id before sending upstream
             clean_messages = []
             for m in assembled:
                 clean = {k: v for k, v in m.items() if k != 'xiaoke_record_id'}
                 clean_messages.append(clean)
-
 
             if is_stream:
                 def generate_stream():
@@ -293,7 +276,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                             if is_done:
                                 completed = True
                     except Exception:
-                        # Upstream error/disconnect: don't commit
                         return
 
                     if completed:
@@ -307,13 +289,11 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 return Response(generate_stream(), content_type='text/event-stream',
                               headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
             else:
-                # Non-streaming
                 try:
                     upstream_response = forward_non_stream(clean_messages, model, request_options)
                 except Exception as e:
                     return jsonify({'error': {'message': f'upstream error: {str(e)}', 'type': 'upstream_error'}}), 502
 
-                # Extract assistant reply
                 choices = upstream_response.get('choices', [])
                 reply = ''
                 if choices:
@@ -327,7 +307,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 return jsonify(upstream_response)
 
         else:
-            # Local mock mode (stage 3A)
             if is_stream:
                 disconnect = request.headers.get('X-Xiaoke-Test-Disconnect') == '1'
 
@@ -367,7 +346,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     return app
 
 
-# Mock SSE helpers (retained for local testing)
 def mock_sse_events(user_text, model, simulate_disconnect=False):
     response_id = f'chatcmpl-xiaoke-mock-{uuid.uuid4().hex}'
     words = ['[xiaoke local mock] ', 'received: ', user_text]
