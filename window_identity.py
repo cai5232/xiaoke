@@ -44,7 +44,7 @@ def identify_window(headers: Any, messages: list[dict[str, Any]], store: Timelin
     """Identify an existing window, or return an unbound new-window identity."""
     source = _source(headers)
     conversation_id = headers.get("X-Conversation-ID", "").strip()
-    explicit_id = headers.get("X-Xiaoke-Session-ID", "").strip()
+    explicit_id = (headers.get("X-Xiaoke-Session-ID", "") or headers.get("X-Session-Id", "")).strip()
     if conversation_id:
         return WindowIdentity(f"kelivo:{conversation_id}", source, "kelivo-header")
     if explicit_id:
