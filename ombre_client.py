@@ -46,7 +46,7 @@ def get_breath_memories(max_results: int = 15) -> Optional[str]:
             headers=_headers(),
             method='POST',
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=3) as resp:
             raw = resp.read()
             # Streamable HTTP 可能返回多行 SSE 或单个 JSON，兼容两种
             text = raw.decode('utf-8', errors='replace')
