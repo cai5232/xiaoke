@@ -236,17 +236,22 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
 
         # 拉取 jiwen 语调指引，注入 system prompt
         guidance = get_guidance('reactive')
-        if guidance:
+        if guidance or breath_text:
             injected_systems = []
             found_system = False
+            extra = ''
+            if breath_text:
+                extra += '\n\n【长期记忆 / 关于言言的记忆】\n' + breath_text
+            if guidance:
+                extra += '\n\n【此刻说话方式】\n' + guidance
             for m in messages:
                 if m.get('role') == 'system' and not found_system:
-                    injected_systems.append({**m, 'content': m['content'] + '\n\n【此刻说话方式】\n' + guidance})
+                    injected_systems.append({**m, 'content': m['content'] + extra})
                     found_system = True
                 else:
                     injected_systems.append(m)
             if not found_system:
-                injected_systems = [{'role': 'system', 'content': '【此刻说话方式】\n' + guidance}] + messages
+                injected_systems = [{'role': 'system', 'content': extra.strip()}] + messages
             messages = injected_systems
 
         # Window identification is frontend-specific and intentionally conservative.
