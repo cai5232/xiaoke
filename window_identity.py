@@ -23,7 +23,13 @@ class WindowIdentity:
 
 
 def _source(headers: Any) -> str:
-    return headers.get("X-Xiaoke-Source", "unknown").strip().lower() or "unknown"
+    src = headers.get("X-Xiaoke-Source", "").strip().lower()
+    if src:
+        return src
+    session_id = headers.get("X-Session-Id", "").strip()
+    if session_id:
+        return session_id.split("-")[0] if "-" in session_id else session_id
+    return "unknown"
 
 
 def _polaris_match(messages: list[dict[str, Any]], store: TimelineStore) -> str | None:
