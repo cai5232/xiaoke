@@ -202,8 +202,15 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         delivered = coreading_deliver(store, reader_id=reader_id, book_id=book_id)
         return jsonify({'success': True, 'delivered': delivered})
 
-    @app.post('/v1/chat/completions')
+    @app.route('/v1/chat/completions', methods=['POST', 'OPTIONS'])
     def chat_completions():
+        if request.method == 'OPTIONS':
+            r = Response('', 204)
+            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type, X-Session-Id'
+            r.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            r.headers['Access-Control-Max-Age'] = '86400'
+            return r
         body = request.get_json(silent=True)
         if required_api_key:
             authorization = request.headers.get("Authorization", "")
