@@ -231,6 +231,9 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         # 通知 jiwen 用户发了消息（异步，不阻塞）
         notify_user_message(user_text)
 
+        # 拉取 OB breath 记忆，注入 system prompt（同步，失败静默跳过）
+        breath_text = get_breath_memories(max_results=15)
+
         # 拉取 jiwen 语调指引，注入 system prompt
         guidance = get_guidance('reactive')
         if guidance:
