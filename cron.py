@@ -138,6 +138,7 @@ def roam_garden() -> str:
                 payload['tools'] = openai_tools
 
             r = client.post(f'{UPSTREAM_URL}/chat/completions', headers=headers, json=payload)
+            print(f'[cron] api status={r.status_code}')
             resp = r.json()
 
             choice = (resp.get('choices') or [{}])[0]
