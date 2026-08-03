@@ -47,9 +47,11 @@ def _init_push_db(push_db: Path):
 
 
 def _get_or_create_vapid_keys(push_db: Path):
-    """返回 (private_key_pem, public_key_base64url)，不存在则生成。"""
+    """Return (private_key_pem, public_key_base64url), creating if missing."""
     try:
         from py_vapid import Vapid
+        import cryptography.hazmat.primitives.serialization as _ser
+        import base64
     except ImportError:
         return None, None
     conn = sqlite3.connect(str(push_db))
@@ -57,16 +59,14 @@ def _get_or_create_vapid_keys(push_db: Path):
     if row:
         conn.close()
         return row[0], row[1]
-    # 生成新密钥
     v = Vapid()
     v.generate_keys()
     priv = v.private_pem().decode() if isinstance(v.private_pem(), bytes) else v.private_pem()
-    pub = v.public_key.public_bytes(
-        __import__('cryptography').hazmat.primitives.serialization.Encoding.X962,
-        __import__('cryptography').hazmat.primitives.serialization.PublicFormat.UncompressedPoint
+    pub_bytes = v.public_key.public_bytes(
+        _ser.Encoding.X962,
+        _ser.PublicFormat.UncompressedPoint
     )
-    import base64
-    pub_b64 = base64.urlsafe_b64encode(pub).rstrip(b'=').decode()
+    pub_b64 = base64.urlsafe_b64encode(pub_bytes).rstrip(b'=').decode()
     conn.execute('INSERT INTO vapid_keys (id, private_key, public_key) VALUES (1, ?, ?)', (priv, pub_b64))
     conn.commit()
     conn.close()
@@ -74,10 +74,9 @@ def _get_or_create_vapid_keys(push_db: Path):
 
 
 def send_push_notification(push_db: Path, session_id: str, title: str, body: str, url: str = '/'):
-    """向指定 session 的所有订阅推送通知。"""
+    """Push a notification to all subscriptions for the given session."""
     try:
         from pywebpush import webpush, WebPushException
-        from py_vapid import Vapid
     except ImportError:
         return
     priv_key, _ = _get_or_create_vapid_keys(push_db)
@@ -100,15 +99,12 @@ def send_push_notification(push_db: Path, session_id: str, title: str, body: str
             )
         except WebPushException as e:
             if e.response and e.response.status_code in (404, 410):
-                # 订阅已失效，删除
                 c = sqlite3.connect(str(push_db))
                 c.execute('DELETE FROM push_subscriptions WHERE endpoint = ?', (endpoint,))
                 c.commit()
                 c.close()
         except Exception:
             pass
-
-
 
 
 def has_upstream() -> bool:
@@ -167,6 +163,9 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     app = Flask(__name__)
     CORS(app)
     store = TimelineStore(db_path)
+    db_path = Path(db_path)
+    push_db = _push_db_path(db_path)
+    _init_push_db(push_db)
     max_records = max_handoff_records if max_handoff_records is not None else int(os.environ.get("MAX_HANDOFF_RECORDS", DEFAULT_HANDOFF_RECORDS))
     max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
     required_api_key = api_key if api_key is not None else os.environ.get("XIAOKE_API_KEY", "")
@@ -199,6 +198,67 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         response.headers.setdefault('Access-Control-Allow-Headers', 'Authorization, Content-Type')
         response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
+
+    # ── Push endpoints ──────────────────────────────────────────────
+
+    @app.get('/internal/push/vapid-public-key')
+    def push_vapid_public_key():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        _, pub_key = _get_or_create_vapid_keys(push_db)
+        if not pub_key:
+            return jsonify({'error': 'vapid not available'}), 503
+        return jsonify({'public_key': pub_key})
+
+    @app.post('/internal/push/subscribe')
+    def push_subscribe():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        body = request.get_json(silent=True) or {}
+        sub = body.get('subscription') or {}
+        session_id = str(body.get('session_id') or 'reverie-yy')
+        endpoint = sub.get('endpoint', '')
+        keys = sub.get('keys', {})
+        p256dh = keys.get('p256dh', '')
+        auth = keys.get('auth', '')
+        if not endpoint or not p256dh or not auth:
+            return jsonify({'error': 'invalid subscription'}), 400
+        conn = sqlite3.connect(str(push_db))
+        conn.execute(
+            '''INSERT INTO push_subscriptions (session_id, endpoint, p256dh, auth)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(endpoint) DO UPDATE SET
+                 session_id=excluded.session_id,
+                 p256dh=excluded.p256dh,
+                 auth=excluded.auth''',
+            (session_id, endpoint, p256dh, auth)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+
+    @app.post('/internal/push/send')
+    def push_send():
+        """Trigger a push notification manually (used by the cron job)."""
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get('session_id') or 'reverie-yy')
+        title = str(body.get('title') or '小克')
+        msg_body = str(body.get('body') or '')
+        url = str(body.get('url') or '/')
+        if not msg_body:
+            return jsonify({'error': 'body is required'}), 400
+        send_push_notification(push_db, session_id, title, msg_body, url)
+        return jsonify({'success': True})
+
+    # ── Timeline endpoints ──────────────────────────────────────────
 
     @app.get('/internal/timeline')
     def internal_timeline():
@@ -315,10 +375,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if not user_text:
             return jsonify({'error': {'message': 'an eligible current user message is required', 'type': 'invalid_request_error'}}), 400
 
-        # 通知 jiwen 用户发了消息（异步，不阻塞）
         notify_user_message(user_text)
 
-        # 拉取 OB breath 记忆 + jiwen 语调指引，同时注入 system prompt
         breath_text = get_breath_memories(max_results=15)
         guidance = get_guidance('reactive')
 
@@ -340,12 +398,10 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 injected_systems = [{'role': 'system', 'content': extra.strip()}] + messages
             messages = injected_systems
 
-        # Window identification
         identity = identify_window(request.headers, messages, store)
         session_id = identity.session_id
         source = identity.source
 
-        # Build assembled messages with timeline injection
         assembled, baseline, continuing = build_messages(messages, store, session_id, max_records, max_chars)
         model = str(body.get('model') or 'claude-opus-4-6-thinking')
         is_stream = body.get('stream', False)
