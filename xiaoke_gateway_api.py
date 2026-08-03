@@ -471,6 +471,16 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
                     if baseline and not continuing:
                         store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+                    # 如果是小窝的请求，推送通知给言言
+                    if source == 'reverie':
+                        import re as _re
+                        # 去掉[心声]块和颜文字，取前50字作通知正文
+                        _body = _re.sub(r'\[心声\][\s\S]*?\[/心声\]', '', reply).strip()
+                        _body = _re.sub(r'\n\n+', '\n', _body).split('\n')[0][:50]
+                        try:
+                            send_push_notification(push_db, session_id or 'reverie-yy', '小克回复了', _body, '/')
+                        except Exception:
+                            pass
 
                 return jsonify(upstream_response)
 
