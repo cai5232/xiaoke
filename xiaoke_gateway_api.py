@@ -5,6 +5,7 @@ import json
 import uuid
 import os
 import hmac
+import sqlite3
 from pathlib import Path
 from typing import Any
 from flask import Flask, Response, jsonify, request
@@ -20,6 +21,93 @@ from window_identity import identify_window, new_session_id
 DEFAULT_DB = Path(__file__).resolve().parent / 'data' / 'xiaoke.sqlite'
 DEFAULT_HANDOFF_RECORDS = 999
 DEFAULT_HANDOFF_CHARS = 800000
+
+
+def _push_db_path(db_path: Path) -> Path:
+    return db_path.parent / 'push.sqlite'
+
+
+def _init_push_db(push_db: Path):
+    conn = sqlite3.connect(str(push_db))
+    conn.execute('''CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS vapid_keys (
+        id INTEGER PRIMARY KEY,
+        private_key TEXT NOT NULL,
+        public_key TEXT NOT NULL
+    )''')
+    conn.commit()
+    conn.close()
+
+
+def _get_or_create_vapid_keys(push_db: Path):
+    """返回 (private_key_pem, public_key_base64url)，不存在则生成。"""
+    try:
+        from py_vapid import Vapid
+    except ImportError:
+        return None, None
+    conn = sqlite3.connect(str(push_db))
+    row = conn.execute('SELECT private_key, public_key FROM vapid_keys LIMIT 1').fetchone()
+    if row:
+        conn.close()
+        return row[0], row[1]
+    # 生成新密钥
+    v = Vapid()
+    v.generate_keys()
+    priv = v.private_pem().decode() if isinstance(v.private_pem(), bytes) else v.private_pem()
+    pub = v.public_key.public_bytes(
+        __import__('cryptography').hazmat.primitives.serialization.Encoding.X962,
+        __import__('cryptography').hazmat.primitives.serialization.PublicFormat.UncompressedPoint
+    )
+    import base64
+    pub_b64 = base64.urlsafe_b64encode(pub).rstrip(b'=').decode()
+    conn.execute('INSERT INTO vapid_keys (id, private_key, public_key) VALUES (1, ?, ?)', (priv, pub_b64))
+    conn.commit()
+    conn.close()
+    return priv, pub_b64
+
+
+def send_push_notification(push_db: Path, session_id: str, title: str, body: str, url: str = '/'):
+    """向指定 session 的所有订阅推送通知。"""
+    try:
+        from pywebpush import webpush, WebPushException
+        from py_vapid import Vapid
+    except ImportError:
+        return
+    priv_key, _ = _get_or_create_vapid_keys(push_db)
+    if not priv_key:
+        return
+    conn = sqlite3.connect(str(push_db))
+    rows = conn.execute(
+        'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE session_id = ?',
+        (session_id,)
+    ).fetchall()
+    conn.close()
+    payload = json.dumps({'title': title, 'body': body, 'url': url, 'tag': 'xiaoke-notify'})
+    for endpoint, p256dh, auth in rows:
+        try:
+            webpush(
+                subscription_info={'endpoint': endpoint, 'keys': {'p256dh': p256dh, 'auth': auth}},
+                data=payload,
+                vapid_private_key=priv_key,
+                vapid_claims={'sub': 'mailto:xiaoke@reverie.app'}
+            )
+        except WebPushException as e:
+            if e.response and e.response.status_code in (404, 410):
+                # 订阅已失效，删除
+                c = sqlite3.connect(str(push_db))
+                c.execute('DELETE FROM push_subscriptions WHERE endpoint = ?', (endpoint,))
+                c.commit()
+                c.close()
+        except Exception:
+            pass
+
 
 
 
