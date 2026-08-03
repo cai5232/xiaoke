@@ -95,12 +95,14 @@ def call_mcp_tool(name: str, args: dict) -> str:
 
 def roam_garden() -> str:
     """自主途步花园，返回汇报文本。"""
+    print(f'[cron] UPSTREAM_URL={UPSTREAM_URL!r} KEY_SET={bool(UPSTREAM_KEY)} GALATEA={bool(GALATEA_TOKEN)}')
     if not UPSTREAM_URL or not UPSTREAM_KEY:
         print('[cron] no upstream configured, skipping')
         return ''
 
     # 先拉工具列表
     tools = get_mcp_tools()
+    print(f'[cron] got {len(tools)} mcp tools')
     openai_tools = []
     for t in tools:
         openai_tools.append({
