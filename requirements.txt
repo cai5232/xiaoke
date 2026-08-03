@@ -4,3 +4,5 @@ gunicorn>=21,<24
 flask-cors>=4.0,<5
 pywebpush>=2.0,<3
 py-vapid>=1.9,<2
+pywebpush>=2.0,<3
+py-vapid>=1.9,<2
