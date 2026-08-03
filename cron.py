@@ -25,8 +25,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # 配置
-UPSTREAM_URL = (os.environ.get('XIAOKE_UPSTREAM_URL') or os.environ.get('UPSTREAM_BASE_URL') or '').rstrip('/')
-UPSTREAM_KEY = os.environ.get('UPSTREAM_API_KEY', '')
+UPSTREAM_URL = (os.environ.get('XIAOKE_SELF_URL') or 'http://localhost:3010').rstrip('/')
+UPSTREAM_KEY = os.environ.get('XIAOKE_API_KEY', '')
 MODEL = os.environ.get('UPSTREAM_MODEL', '[Kiro] claude-sonnet-4-6-thinking [不补]')
 GALATEA_TOKEN = os.environ.get('GALATEA_TOKEN', '')
 XIAOKE_API_KEY = os.environ.get('XIAOKE_API_KEY', '')
