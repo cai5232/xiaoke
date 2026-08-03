@@ -2,3 +2,5 @@ Flask>=3.0,<4
 httpx>=0.27,<1
 gunicorn>=21,<24
 flask-cors>=4.0,<5
+pywebpush>=2.0,<3
+py-vapid>=1.9,<2
