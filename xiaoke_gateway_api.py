@@ -199,6 +199,21 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
 
+    # ── Cron manual trigger ─────────────────────────────────────────
+
+    @app.post('/internal/cron/run')
+    def cron_run():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        try:
+            from cron import main as cron_main
+            cron_main()
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
     # ── Push endpoints ──────────────────────────────────────────────
 
     @app.get('/internal/push/vapid-public-key')
