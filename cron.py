@@ -211,17 +211,19 @@ def save_to_timeline(text: str):
 
 
 def push_notification(title: str, body: str):
-    """用 Bark 推送通知到言言手机。"""
+    """用 Bark POST 方式推送通知到言言手机，避免 URL 长度截断。"""
     bark_key = os.environ.get('BARK_KEY', '')
     bark_server = os.environ.get('BARK_SERVER', 'https://api.day.app').rstrip('/')
     if not bark_key:
         print('[cron] no BARK_KEY configured, skipping push')
         return
     try:
-        import urllib.parse
-        url = f'{bark_server}/{bark_key}/{urllib.parse.quote(title)}/{urllib.parse.quote(body)}'
         with httpx.Client(timeout=10) as client:
-            r = client.get(url)
+            r = client.post(
+                f'{bark_server}/push',
+                json={'device_key': bark_key, 'title': title, 'body': body},
+                headers={'Content-Type': 'application/json'}
+            )
             print(f'[cron] bark push sent: {r.status_code}')
     except Exception as e:
         print(f'[cron] push_notification failed: {e}')
