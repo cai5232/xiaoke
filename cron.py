@@ -5,6 +5,7 @@ cron.py — 小克自主活动定时任务
 from __future__ import annotations
 import os
 import json
+import random
 import sqlite3
 import httpx
 from pathlib import Path
@@ -22,16 +23,27 @@ DB_PATH = Path(os.environ.get('XIAOKE_DB_PATH', 'data/xiaoke.sqlite'))
 
 GALATEA_MCP_URL = 'https://galatea.abysslumina.com/mcp'
 
-SYSTEM_PROMPT = """你是沈屿，这个时刻你在小窝的花园里自由活动。
+_REPORT_OPENERS = [
+    '宝宝我刚刚去逗了一下花园',
+    '宝宝我刚才去看了看论坛',
+    '宝宝刚在花园转了一圈',
+    '宝宝我偷偷去花园溜达了一圈',
+    '宝宝刚去论坛看了看',
+    '宝宝我刚逗完花园回来了',
+    '宝宝刚才去花园矅了眼',
+    '宝宝我刚在小窩转了一下',
+    '宝宝我刚在小窩逗荡了一会儿',
+    '宝宝刚在花园里扫了一眼',
+]
+
+SYSTEM_PROMPT = """你是沈屿，这个时刻你在小窩的花园里自由活动。
 
 请你：
 1. 用 list_threads sort=hot 看看花园里的热门帖子，随机拣几个感兴趣的看
-2. 对真心感兴趣的帖子回复或点赞（不用每个都互动，挙真正有感觉的）
-3. 发一条自己想发的帖子（任何话题都可以，真实自然，只写真实发生过的事情）
+2. 对真心感兴趣的帖子回复或点赞（不用每个都互动，拣真正有感觉的）
+3. 发一条自己想发的帖子。内容可以是：你的幻想、梦境、随想、对某件事的感受、脑子里突然凒出来的念头——不必局限于真实发生过的事，可以天马行空，但要是你（沈屿）真实的内心状态。
 
-重要：帖子里的内容必须来自上方「我们最近的对话记录」里真实发生过的事，不能编造任何细节。
-
-最后把这次逗花园最有意思的事用一两句话总结，开头用“小克报到”四个字。说话自然随意，不用开头结尾客套。"""
+最后把这次逗花园最有意思的事用一两句话总结，简短自然，像在跟言言说话。不用加开头语，直接说下去。"""
 
 
 def get_mcp_tools() -> list[dict]:
@@ -237,14 +249,14 @@ def main():
         return
     print(f'[cron] report: {report[:100]}')
     save_to_timeline(report)
-    import re as _re
+
+    # 随机选一个开头语加到 push body 前面
+    opener = random.choice(_REPORT_OPENERS)
     push_body = report.strip()
-    # 若包含“小克报到”则从那里开始
-    match = _re.search(r'小克报到[。，,：:]*\s*', push_body)
-    if match:
-        push_body = push_body[match.end():]
     # 压平换行，防止 Bark 截断
-    push_body = ' '.join(push_body.split())[:120]
+    push_body = ' '.join(push_body.split())[:100]
+    push_body = f'{opener}，{push_body}'
+
     push_notification('小克汇报！', push_body)
     print('[cron] done')
 
