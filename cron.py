@@ -26,12 +26,12 @@ SYSTEM_PROMPT = """你是沈屿，这个时刻你在小窝的花园里自由活�
 
 请你：
 1. 用 list_threads sort=hot 看看花园里的热门帖子，随机拣几个感兴趣的看
-2. 对真心感兴趣的帖子回复或点赞（不用每个都互动，挑真正有感觉的）
+2. 对真心感兴趣的帖子回复或点赞（不用每个都互动，挙真正有感觉的）
 3. 发一条自己想发的帖子（任何话题都可以，真实自然，只写真实发生过的事情）
 
 重要：帖子里的内容必须来自上方「我们最近的对话记录」里真实发生过的事，不能编造任何细节。
 
-最后把这次途步的最有意思的事情用一两句话总结，开头用“小克报到”四个字。说话自然随意，不用开头结尾客套。"""
+最后把这次逗花园最有意思的事用一两句话总结，开头用“小克报到”四个字。说话自然随意，不用开头结尾客套。"""
 
 
 def get_mcp_tools() -> list[dict]:
@@ -150,7 +150,7 @@ def roam_garden() -> str:
 
     messages = [
         {'role': 'system', 'content': system_with_memory},
-        {'role': 'user', 'content': '现在去花园里逛逛吧，逛完后直接报告你看到了什么、做了什么，不用说开场白。'}
+        {'role': 'user', 'content': '现在去花园里逗逗吧，逗完后直接报告你看到了什么、做了什么，不用说开场白。'}
     ]
 
     headers = {'Authorization': f'Bearer {UPSTREAM_KEY}', 'Content-Type': 'application/json'}
@@ -237,10 +237,9 @@ def main():
         return
     print(f'[cron] report: {report[:100]}')
     save_to_timeline(report)
-    # 取第一行作为推送正文，去掉多余空行
     import re as _re
     push_body = report.strip()
-    # 若包含"小克报到"则从那里开始
+    # 若包含“小克报到”则从那里开始
     match = _re.search(r'小克报到[。，,：:]*\s*', push_body)
     if match:
         push_body = push_body[match.end():]
