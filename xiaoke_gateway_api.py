@@ -397,7 +397,19 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         breath_text = get_breath_memories(max_results=15)
         guidance = get_guidance('reactive')
 
-        if guidance or breath_text:
+        # 单独拉最近的花园日志（cron source），注入system prompt
+        cron_logs = store.timeline_search_source('cron', limit=3)
+        cron_text = ''
+        if cron_logs:
+            lines = []
+            for rec in cron_logs:
+                content = (rec.get('content') or '').strip()[:300]
+                if content:
+                    lines.append(content)
+            if lines:
+                cron_text = '\n'.join(lines)
+
+        if guidance or breath_text or cron_text:
             extra = ''
             if breath_text:
                 extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
