@@ -246,7 +246,7 @@ def main():
         push_body = push_body[match.end():]
     # 只取第一段
     push_body = push_body.split('\n')[0][:80]
-    push_notification('小克', push_body)
+    push_notification('小克汇报！', push_body)
     print('[cron] done')
 
 
