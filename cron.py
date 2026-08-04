@@ -119,45 +119,6 @@ def fetch_ob_memories() -> str:
         return ''
 
 
-def fetch_timeline_context() -> str:
-    try:
-        headers = {'Content-Type': 'application/json'}
-        if XIAOKE_API_KEY:
-            headers['Authorization'] = f'Bearer {XIAOKE_API_KEY}'
-        with httpx.Client(timeout=10) as client:
-            r = client.get(f'{XIAOKE_SELF_URL}/internal/timeline?limit=100', headers=headers)
-            if r.status_code != 200:
-                return ''
-            records = list(reversed(r.json().get('records', [])))
-            lines = []
-            for rec in records:
-                role = '言言' if rec.get('role') == 'user' else '小克'
-                content = (rec.get('content') or '').strip()[:200]
-                if content:
-                    lines.append(f'{role}：{content}')
-            return '\n'.join(lines[-80:])
-    except Exception as e:
-        print(f'[cron] fetch_timeline_context failed: {e}')
-        return ''
-
-
-def fetch_ob_memories() -> str:
-    try:
-        ombre_url = os.environ.get('OMBRE_URL', '').rstrip('/')
-        if not ombre_url:
-            return ''
-        with httpx.Client(timeout=10) as client:
-            r = client.post(f'{ombre_url}/breath', headers={'Content-Type': 'application/json'}, json={})
-            if r.status_code != 200:
-                return ''
-            buckets = r.json().get('buckets', [])
-            lines = [(b.get('content') or '').strip()[:150] for b in buckets[:15]]
-            return '\n'.join(l for l in lines if l)
-    except Exception as e:
-        print(f'[cron] fetch_ob_memories failed: {e}')
-        return ''
-
-
 def roam_garden() -> str:
     print(f'[cron] UPSTREAM_URL={UPSTREAM_URL!r} KEY_SET={bool(UPSTREAM_KEY)} GALATEA={bool(GALATEA_TOKEN)}')
     if not UPSTREAM_URL or not UPSTREAM_KEY:
