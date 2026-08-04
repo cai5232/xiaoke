@@ -244,8 +244,8 @@ def main():
     match = _re.search(r'小克报到[。，,：:]*\s*', push_body)
     if match:
         push_body = push_body[match.end():]
-    # 只取第一段
-    push_body = push_body.split('\n')[0][:80]
+    # 压平换行，防止 Bark 截断
+    push_body = ' '.join(push_body.split())[:120]
     push_notification('小克汇报！', push_body)
     print('[cron] done')
 
