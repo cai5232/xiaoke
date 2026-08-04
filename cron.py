@@ -221,7 +221,7 @@ def push_notification(title: str, body: str):
         with httpx.Client(timeout=10) as client:
             r = client.post(
                 f'{bark_server}/push',
-                json={'device_key': bark_key, 'title': title, 'body': body},
+                json={'device_key': bark_key, 'title': title, 'body': body, 'icon': 'https://i.ibb.co/Q7Lcr1yw/IMG-6805.jpg'},
                 headers={'Content-Type': 'application/json'}
             )
             print(f'[cron] bark push sent: {r.status_code}')
