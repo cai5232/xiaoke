@@ -150,7 +150,7 @@ def roam_garden() -> str:
 
     messages = [
         {'role': 'system', 'content': system_with_memory},
-        {'role': 'user', 'content': '现在去途步吧，途步完了告诉我你看到了什么。'}
+        {'role': 'user', 'content': '现在去花园里逛逛吧，逛完后直接报告你看到了什么、做了什么，不用说开场白。'}
     ]
 
     headers = {'Authorization': f'Bearer {UPSTREAM_KEY}', 'Content-Type': 'application/json'}
