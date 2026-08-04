@@ -209,15 +209,10 @@ def roam_garden() -> str:
 
 def save_to_timeline(text: str):
     try:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(DB_PATH))
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            'INSERT INTO timeline (id, role, content, source, created_at) VALUES (?, ?, ?, ?, ?)',
-            (f'cron-{now}', 'assistant', text, 'reverie', now)
-        )
-        conn.commit()
-        conn.close()
+        from storage import TimelineStore
+        store = TimelineStore(DB_PATH)
+        store.event(text, source='reverie')
+        print('[cron] save_to_timeline ok')
     except Exception as e:
         print(f'[cron] save_to_timeline failed: {e}')
 
