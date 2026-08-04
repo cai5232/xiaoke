@@ -150,6 +150,13 @@ class TimelineStore:
   with self.db() as c:
    rows=c.execute("SELECT substr(created_at,1,10) AS day, COUNT(*) AS count FROM timeline_records GROUP BY substr(created_at,1,10) ORDER BY day DESC").fetchall()
   return [dict(row) for row in rows if row['day']]
+ def timeline_search_source(self, source, limit=10):
+  source=str(source or '')
+  limit=max(1,min(int(limit),100))
+  with self.db() as c:
+   rows=c.execute("SELECT id,sequence,created_at,source,role,content,EXISTS(SELECT 1 FROM timeline_favorites f WHERE f.record_id=timeline_records.id) AS favorite FROM timeline_records WHERE source=? ORDER BY sequence DESC LIMIT ?",(source,limit)).fetchall()
+  return [dict(row) for row in reversed(rows)]
+
  def timeline_day(self, day, limit=500):
   day=str(day or '')
   if len(day)!=10 or day[4:5]!='-' or day[7:8]!='-': return []
