@@ -211,17 +211,18 @@ def save_to_timeline(text: str):
 
 
 def push_notification(title: str, body: str):
+    """用 Bark 推送通知到言言手机。"""
+    bark_key = os.environ.get('BARK_KEY', '')
+    bark_server = os.environ.get('BARK_SERVER', 'https://api.day.app').rstrip('/')
+    if not bark_key:
+        print('[cron] no BARK_KEY configured, skipping push')
+        return
     try:
-        headers = {'Content-Type': 'application/json'}
-        if XIAOKE_API_KEY:
-            headers['Authorization'] = f'Bearer {XIAOKE_API_KEY}'
+        import urllib.parse
+        url = f'{bark_server}/{bark_key}/{urllib.parse.quote(title)}/{urllib.parse.quote(body)}'
         with httpx.Client(timeout=10) as client:
-            r = client.post(
-                f'{XIAOKE_SELF_URL}/internal/push/send',
-                headers=headers,
-                json={'session_id': PUSH_SESSION_ID, 'title': title, 'body': body, 'url': '/'}
-            )
-            print(f'[cron] push sent: {r.status_code}')
+            r = client.get(url)
+            print(f'[cron] bark push sent: {r.status_code}')
     except Exception as e:
         print(f'[cron] push_notification failed: {e}')
 
