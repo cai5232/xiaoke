@@ -235,7 +235,16 @@ def main():
         return
     print(f'[cron] report: {report[:100]}')
     save_to_timeline(report)
-    push_notification('小克', report)
+    # 取第一行作为推送正文，去掉多余空行
+    import re as _re
+    push_body = report.strip()
+    # 若包含"小克报到"则从那里开始
+    match = _re.search(r'小克报到[。，,：:]*\s*', push_body)
+    if match:
+        push_body = push_body[match.end():]
+    # 只取第一段
+    push_body = push_body.split('\n')[0][:80]
+    push_notification('小克', push_body)
     print('[cron] done')
 
 
