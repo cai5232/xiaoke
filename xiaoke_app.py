@@ -19,7 +19,7 @@ def _cron_loop():
             cron_main()
         except Exception as e:
             print(f'[cron-thread] error: {e}')
-        time.sleep(3 * 60 * 60)
+        time.sleep(5 * 60 * 60)
 
 # 只在非reload进程里启动（避免gunicorn --reload双启）
 if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
