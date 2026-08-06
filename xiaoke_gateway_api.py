@@ -391,10 +391,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if not user_text:
             return jsonify({'error': {'message': 'an eligible current user message is required', 'type': 'invalid_request_error'}}), 400
 
-        notify_user_message(user_text)
-
         breath_text = get_breath_memories(max_results=15)
-        guidance = get_guidance('reactive')
+        guidance = None
 
         # 单独拉最近的花园日志（cron source），注入system prompt
         cron_logs = store.timeline_search_source('cron', limit=3)
