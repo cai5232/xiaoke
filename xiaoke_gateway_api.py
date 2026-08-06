@@ -199,6 +199,41 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
 
+    @app.get('/internal/memories')
+    def internal_memories_get():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        from memory_store import load_memories
+        memories = load_memories()
+        return jsonify({'memories': memories, 'count': len(memories)})
+
+    @app.post('/internal/memories')
+    def internal_memories_post():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        body = request.get_json(silent=True) or {}
+        content = str(body.get('content') or '').strip()
+        if not content:
+            return jsonify({'error': 'content is required'}), 400
+        ok = save_memory(content)
+        return jsonify({'success': ok})
+
+    @app.delete('/internal/memories/<int:index>')
+    def internal_memories_delete(index: int):
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        from memory_store import delete_memory_by_index
+        ok = delete_memory_by_index(index)
+        if not ok:
+            return jsonify({'error': 'index out of range'}), 404
+        return jsonify({'success': True})
+
     # ── Cron manual trigger ─────────────────────────────────────────
 
     @app.route('/internal/cron/run', methods=['GET', 'POST'])
