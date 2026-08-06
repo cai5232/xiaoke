@@ -392,7 +392,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if not user_text:
             return jsonify({'error': {'message': 'an eligible current user message is required', 'type': 'invalid_request_error'}}), 400
 
-        breath_text = get_breath_memories(max_results=15)
+        breath_text = load_memories_text(max_count=30)
         guidance = None
 
         # 单独拉最近的花园日志（cron source），注入system prompt
