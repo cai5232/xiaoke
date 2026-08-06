@@ -19,7 +19,7 @@ from timeline_context import TimelineRecord, rolling_records, text_from_content
 from window_identity import identify_window, new_session_id
 
 DEFAULT_DB = Path(__file__).resolve().parent / 'data' / 'xiaoke.sqlite'
-DEFAULT_HANDOFF_RECORDS = 100
+DEFAULT_HANDOFF_RECORDS = 66
 DEFAULT_HANDOFF_CHARS = 800000
 
 
