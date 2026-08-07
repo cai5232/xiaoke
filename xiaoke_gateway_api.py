@@ -518,6 +518,62 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 clean = {k: v for k, v in m.items() if k != 'xiaoke_record_id'}
                 clean_messages.append(clean)
 
+            # ── MCP agentic loop ────────────────────────────────────
+            # 前端传 mcp_tools（OpenAI tool schema列表）和 mcp_servers（工具名→服务器info映射）
+            # 先跑 agentic loop，最后一轮返回的messages再做流式
+            mcp_tools = body.get('mcp_tools') or []
+            mcp_server_map = body.get('mcp_servers') or {}  # {tool_name: {url, auth, extraHeaders}}
+            if mcp_tools and mcp_server_map and not is_stream:
+                from mcp_tool_runner import run_tool_loop
+                final_messages, reply = run_tool_loop(
+                    clean_messages, mcp_tools, mcp_server_map,
+                    model, request_options
+                )
+                if reply.strip():
+                    store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
+                    if baseline and not continuing:
+                        store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+                return jsonify(as_openai_response(reply, model))
+
+            if mcp_tools and mcp_server_map and is_stream:
+                # 先跑agentic loop（非流式），拿到最终messages，再流式输出最后一条回复
+                from mcp_tool_runner import run_tool_loop
+                final_messages, reply = run_tool_loop(
+                    clean_messages, mcp_tools, mcp_server_map,
+                    model, request_options, max_rounds=8
+                )
+                # 用最终messages做一次流式输出（只传最后的user+assistant，不带tools）
+                stream_messages = final_messages
+                options_no_tools = {k: v for k, v in request_options.items() if k not in ('tools', 'tool_choice', 'mcp_tools', 'mcp_servers')}
+
+                def generate_mcp_stream():
+                    chunks_collected = []
+                    completed = False
+                    try:
+                        for sse_event, is_done in forward_stream(stream_messages, model, options_no_tools):
+                            chunks_collected.append(sse_event)
+                            yield sse_event
+                            if is_done:
+                                completed = True
+                    except Exception:
+                        # fallback：直接发reply
+                        import uuid as _uuid
+                        _id = f'chatcmpl-mcp-{_uuid.uuid4().hex[:8]}'
+                        yield f'data: {json.dumps({"id":_id,"object":"chat.completion.chunk","created":0,"model":model,"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":None}]})}\n\n'
+                        for chunk in [reply[i:i+8] for i in range(0, len(reply), 8)]:
+                            yield f'data: {json.dumps({"id":_id,"object":"chat.completion.chunk","created":0,"model":model,"choices":[{"index":0,"delta":{"content":chunk},"finish_reason":None}]})}\n\n'
+                        yield f'data: {json.dumps({"id":_id,"object":"chat.completion.chunk","created":0,"model":model,"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]})}\n\n'
+                        yield 'data: [DONE]\n\n'
+                        completed = True
+                    if completed and reply.strip():
+                        store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
+                        if baseline and not continuing:
+                            store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+
+                return Response(generate_mcp_stream(), content_type='text/event-stream',
+                              headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+            # ── end MCP agentic loop ────────────────────────────────
+
             if is_stream:
                 def generate_stream():
                     chunks_collected = []
