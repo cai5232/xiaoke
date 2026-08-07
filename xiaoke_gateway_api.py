@@ -310,6 +310,46 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         send_push_notification(push_db, session_id, title, msg_body, url)
         return jsonify({'success': True})
 
+    @app.route('/internal/mcp-proxy', methods=['POST', 'OPTIONS'])
+    def mcp_proxy():
+        """代理 MCP HTTP 请求，解决前端 CORS 问题。
+        body: { url, method, headers, body }
+        """
+        if request.method == 'OPTIONS':
+            r = Response('', 204)
+            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+            r.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            return r
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        body = request.get_json(silent=True) or {}
+        target_url = str(body.get('url') or '')
+        method = str(body.get('method') or 'POST').upper()
+        extra_headers = dict(body.get('headers') or {})
+        payload = body.get('body')
+        if not target_url:
+            return jsonify({'error': 'url is required'}), 400
+        try:
+            import requests as _req
+            resp = _req.request(
+                method,
+                target_url,
+                json=payload if isinstance(payload, dict) else None,
+                data=json.dumps(payload) if isinstance(payload, str) else None,
+                headers={'Content-Type': 'application/json', **extra_headers},
+                timeout=30
+            )
+            try:
+                data = resp.json()
+            except Exception:
+                data = resp.text
+            return jsonify({'status': resp.status_code, 'data': data})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 502
+
     # ── Timeline endpoints ──────────────────────────────────────────
 
     @app.get('/internal/timeline')
