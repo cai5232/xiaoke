@@ -64,28 +64,27 @@ def forward_stream(messages: list[dict], model: str, request_options: dict | Non
         with client.stream('POST', url, json=payload, headers=_headers()) as resp:
             resp.raise_for_status()
             buffer = ''
-            for chunk in resp.iter_text():
-                buffer += chunk
-                while '\n' in buffer:
-                    line, buffer = buffer.split('\n', 1)
+            for raw_chunk in resp.iter_bytes():
+                buffer += raw_chunk.decode('utf-8', errors='replace')
+                lines = buffer.split('\n')
+                buffer = lines.pop()  # 最后一个不完整的行留到下一轮拼接
+                for line in lines:
                     line = line.strip()
                     if not line:
                         continue
                     if line.startswith('data:'):
-                        event_str = line + '\n\n'
                         data_part = line[5:].strip()
                         is_done = (data_part == '[DONE]')
-                        yield event_str, is_done
+                        yield line + '\n\n', is_done
                         if is_done:
                             return
-            # Handle remaining buffer
+            # 处理剩余 buffer
             if buffer.strip():
                 line = buffer.strip()
                 if line.startswith('data:'):
-                    event_str = line + '\n\n'
                     data_part = line[5:].strip()
                     is_done = (data_part == '[DONE]')
-                    yield event_str, is_done
+                    yield line + '\n\n', is_done
 
 
 def extract_stream_content(sse_events: list[str]) -> str:
