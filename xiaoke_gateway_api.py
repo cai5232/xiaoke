@@ -482,6 +482,19 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if lines:
                 cron_text = '\n'.join(lines)
 
+        # 拉最近的小窝对话（reverie source），注入system prompt，实现跨窗口感知
+        reverie_logs = store.timeline_search_source('reverie', limit=6)
+        reverie_text = ''
+        if reverie_logs and source != 'reverie':  # 只在非小窝请求时注入，避免重复
+            lines = []
+            for rec in reverie_logs:
+                role_label = '言言' if rec.get('role') == 'user' else '小克'
+                content = (rec.get('content') or '').strip()[:200]
+                if content:
+                    lines.append(f'[{role_label}] {content}')
+            if lines:
+                reverie_text = '\n'.join(lines)
+
         if guidance or breath_text or cron_text:
             extra = ''
             if breath_text:
