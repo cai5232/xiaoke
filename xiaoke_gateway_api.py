@@ -199,47 +199,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
 
-    # ── KV 持久存储（前端 localStorage 备份）──────────────────────
-
-    KV_SCHEMA = '''
-    CREATE TABLE IF NOT EXISTS kv_store (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-    );'''
-    with store.db() as _c:
-        _c.executescript(KV_SCHEMA)
-
-    @app.get('/internal/kv/<key>')
-    def kv_get(key):
-        authorization = request.headers.get('Authorization', '')
-        token = authorization[7:] if authorization.startswith('Bearer ') else ''
-        if required_api_key and not hmac.compare_digest(token, required_api_key):
-            return jsonify({'error': 'unauthorized'}), 401
-        with store.db() as c:
-            row = c.execute('SELECT value FROM kv_store WHERE key=?', (key,)).fetchone()
-        if row is None:
-            return jsonify({'key': key, 'value': None, 'found': False})
-        return jsonify({'key': key, 'value': json.loads(row['value']), 'found': True})
-
-    @app.put('/internal/kv/<key>')
-    def kv_put(key):
-        authorization = request.headers.get('Authorization', '')
-        token = authorization[7:] if authorization.startswith('Bearer ') else ''
-        if required_api_key and not hmac.compare_digest(token, required_api_key):
-            return jsonify({'error': 'unauthorized'}), 401
-        body = request.get_json(silent=True)
-        if body is None:
-            return jsonify({'error': 'json body required'}), 400
-        value = body.get('value')
-        serialized = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
-        with store.db() as c:
-            c.execute(
-                'INSERT INTO kv_store(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at',
-                (key, serialized, utcnow())
-            )
-        return jsonify({'success': True})
-
     @app.get('/internal/memories')
     def internal_memories_get():
         authorization = request.headers.get('Authorization', '')
