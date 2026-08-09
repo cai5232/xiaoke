@@ -495,12 +495,14 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if lines:
                 reverie_text = '\n'.join(lines)
 
-        if guidance or breath_text or cron_text:
+        if guidance or breath_text or cron_text or reverie_text:
             extra = ''
             if breath_text:
                 extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
             if guidance:
                 extra += '\n\n[此刻说话方式]\n' + guidance
+            if reverie_text:
+                extra += '\n\n[小窝最近的对话记录]\n' + reverie_text
             injected_systems = []
             found_system = False
             for m in messages:
