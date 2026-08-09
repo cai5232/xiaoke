@@ -519,10 +519,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 injected_systems = [{'role': 'system', 'content': extra.strip()}] + messages
             messages = injected_systems
 
-        identity = identify_window(request.headers, messages, store)
-        session_id = identity.session_id
-        source = identity.source
-
         assembled, baseline, continuing = build_messages(messages, store, session_id, max_records, max_chars)
         model = str(body.get('model') or 'claude-opus-4-6-thinking')
         is_stream = body.get('stream', False)
