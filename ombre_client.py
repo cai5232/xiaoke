@@ -105,7 +105,7 @@ def search_memories(query: str, max_results: int = 4) -> Optional[str]:
         return None
     content = _call_mcp_tool('breath_search', {
         'query': query[:150],
-        'max_results': max_results,
+        'max_results': 10,
     })
     if not content:
         return None
