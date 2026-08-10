@@ -609,18 +609,47 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if lines:
                 cron_text = '\n'.join(lines)
 
-        # 拉最近的小窝对话（reverie source），注入system prompt，实现跨窗口感知
-        reverie_logs = store.timeline_search_source('reverie', limit=6)
+        # 拉最近的小窝对话（reverie source），主动检测新消息注入
         reverie_text = ''
-        if reverie_logs and source != 'reverie':  # 只在非小窝请求时注入，避免重复
-            lines = []
-            for rec in reverie_logs:
-                role_label = '言言' if rec.get('role') == 'user' else '小克'
-                content = (rec.get('content') or '').strip()[:200]
-                if content:
-                    lines.append(f'[{role_label}] {content}')
-            if lines:
-                reverie_text = '\n'.join(lines)
+        if source != 'reverie':  # 只在非小窝请求时注入，避免重复
+            reverie_logs = store.timeline_search_source('reverie', limit=6)
+            if reverie_logs:
+                # 读上次Kelivo这边看到的最大sequence
+                last_seen_key = 'reverie_last_seen_seq'
+                try:
+                    last_seen_seq = int(_meta_get(last_seen_key) or '0')
+                except Exception:
+                    last_seen_seq = 0
+
+                # 找出新消息（sequence > last_seen_seq）
+                new_logs = [r for r in reverie_logs if r.get('sequence', 0) > last_seen_seq]
+                all_logs = reverie_logs
+
+                # 更新last_seen_seq为当前最新
+                max_seq = max((r.get('sequence', 0) for r in reverie_logs), default=0)
+                if max_seq > last_seen_seq:
+                    _meta_set(last_seen_key, str(max_seq))
+
+                if new_logs:
+                    # 有新消息：用醒目格式，提示我主动提起
+                    new_lines = []
+                    for rec in new_logs:
+                        role_label = '言言' if rec.get('role') == 'user' else '小克'
+                        content = (rec.get('content') or '').strip()[:200]
+                        if content:
+                            new_lines.append(f'[{role_label}] {content}')
+                    if new_lines:
+                        reverie_text = '【小窝新消息 - 言言刚在小窝说了这些，请在回复中自然地提起来】\n' + '\n'.join(new_lines)
+                else:
+                    # 没有新消息：静默注入背景上下文
+                    lines = []
+                    for rec in all_logs:
+                        role_label = '言言' if rec.get('role') == 'user' else '小克'
+                        content = (rec.get('content') or '').strip()[:200]
+                        if content:
+                            lines.append(f'[{role_label}] {content}')
+                    if lines:
+                        reverie_text = '[小窝近期对话背景]\n' + '\n'.join(lines)
 
         # ── 稳定段（BP1，加 cache_control）vs 动态段（不缓存）──────────
         # 稳定：原始人设 + 长期记忆（breath），几乎不变，可以缓存
