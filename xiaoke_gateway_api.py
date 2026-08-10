@@ -515,15 +515,16 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         memory_instruction = (
             '\n\n[记忆操作指令]\n'
             '每条回复后，根据本轮对话自行判断是否值得存入长期记忆。\n'
-            '如果决定存入，在回复末尾单独一行追加：\n'
-            '[HOLD] 内容 | tags:标签 | importance:重要度(1-10)\n'
-            '（内容、tags、importance 都是可选填的，tags 和 importance 可不写）\n'
-            '如果决定不存入，不写任何 [HOLD] 标记即可，不要解释。'
+            '如果决定存入，在回复最后单独一行追加（必须是最后一行，前面不要有空行）：\n'
+            '<!--HOLD: 内容 | tags:标签 | importance:重要度-->\n'
+            '（tags 和 importance 可不写）\n'
+            '如果不存入，不写任何 <!--HOLD--> 即可，不要解释。\n'
+            '注意：<!--HOLD--> 这行是给系统读的，不会显示给用户，请正常回复后再加。'
         )
         if force_hold:
             memory_instruction += (
-                '\n\n⚠️ 注意：你已连续 5 条没有主动存入记忆，本条必须存入一条，'
-                '请在回复末尾追加 [HOLD] 标记，内容是本轮对话最值得记录的信息。'
+                '\n\n⚠️ 你已连续 5 条没有主动存入记忆，本条必须存入一条，'
+                '请在回复末尾追加 <!--HOLD: 本轮最值得记录的信息-->。'
             )
 
         breath_text = load_memories_text(max_count=30)
