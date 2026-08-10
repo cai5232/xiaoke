@@ -170,6 +170,31 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
     required_api_key = api_key if api_key is not None else os.environ.get("XIAOKE_API_KEY", "")
 
+    # ── Meta KV helpers（存 per-session turns_since_memory 计数）──────────────────
+
+    def _meta_get(key: str) -> str:
+        """读 KV，不存在返回空串。"""
+        try:
+            conn = sqlite3.connect(str(db_path))
+            row = conn.execute(
+                'CREATE TABLE IF NOT EXISTS meta_kv (key TEXT PRIMARY KEY, value TEXT); '
+                'SELECT value FROM meta_kv WHERE key=?', (key,)
+            ).fetchone()
+            conn.close()
+            return row[0] if row else ''
+        except Exception:
+            return ''
+
+    def _meta_set(key: str, value: str):
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.execute('CREATE TABLE IF NOT EXISTS meta_kv (key TEXT PRIMARY KEY, value TEXT)')
+            conn.execute('INSERT INTO meta_kv (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', (key, value))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
     @app.get('/healthz')
     def healthz():
         mode = 'upstream' if has_upstream() else 'local-mock'
