@@ -336,6 +336,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         return jsonify({'success': True})
 
     # ── OB Dashboard 全量桶接口 ─────────────────────────────────────
+    _ob_session_cookie: dict = {'value': '', 'ts': 0.0}
+
     @app.route('/internal/ombre-buckets', methods=['GET', 'OPTIONS'])
     def ombre_buckets():
         if request.method == 'OPTIONS':
@@ -349,102 +351,54 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if required_api_key and not hmac.compare_digest(token, required_api_key):
             return jsonify({'error': 'unauthorized'}), 401
 
+        import requests as _req
+        import time as _time
         ombre_url = (os.environ.get('OMBRE_URL') or '').rstrip('/')
         if not ombre_url:
             return jsonify({'error': 'OMBRE_URL not configured'}), 503
+        dashboard_password = os.environ.get('OMBRE_DASHBOARD_PASSWORD', '')
 
-        # 用 MCP breath_advanced catalog 多段日期切片拉全量桶
-        # OB 没有 REST /api/buckets，只能走 MCP
-        date_ranges = [
-            {'date_to': '2026-07-24'},
-            {'date_from': '2026-07-25', 'date_to': '2026-07-31'},
-            {'date_from': '2026-08-01', 'date_to': '2026-08-07'},
-            {'date_from': '2026-08-08'},
-        ]
+        def _do_login():
+            resp = _req.post(
+                f'{ombre_url}/auth/login',
+                json={'password': dashboard_password},
+                headers={'Content-Type': 'application/json'},
+                timeout=10,
+            )
+            if resp.status_code >= 400:
+                return None
+            cookie = ''
+            sc = resp.headers.get('set-cookie', '')
+            if sc:
+                cookie = sc.split(';')[0]
+            _ob_session_cookie['value'] = cookie
+            _ob_session_cookie['ts'] = _time.time()
+            return cookie
 
-        import uuid as _uuid
-        import urllib.request as _urllib
-
-        def _mcp_catalog(args: dict):
-            payload = json.dumps({
-                'jsonrpc': '2.0',
-                'id': _uuid.uuid4().hex,
-                'method': 'tools/call',
-                'params': {'name': 'breath_advanced', 'arguments': {**args, 'catalog': True, 'max_results': 50}}
-            }).encode()
-            hdrs = {'Content-Type': 'application/json'}
-            ob_token = os.environ.get('OMBRE_TOKEN', '')
-            if ob_token:
-                hdrs['Authorization'] = f'Bearer {ob_token}'
-            req = _urllib.Request(f'{ombre_url}/mcp', data=payload, headers=hdrs, method='POST')
-            with _urllib.urlopen(req, timeout=15) as resp:
-                text = resp.read().decode('utf-8', errors='replace')
-            for line in text.splitlines():
-                line = line.strip()
-                if line.startswith('data:'):
-                    line = line[5:].strip()
-                if not line or line == '[DONE]':
-                    continue
-                try:
-                    j = json.loads(line)
-                    content = (j.get('result') or {}).get('content') or []
-                    if content:
-                        return content
-                except Exception:
-                    continue
-            return []
-
-        def _parse_catalog_blocks(blocks) -> list:
-            rows = []
-            seen = set()
-            for block in blocks:
-                for line in (block.get('text') or '').split('\n'):
-                    parts = line.split('|')
-                    if not parts[0].strip():
-                        continue
-                    raw_name = parts[0].strip()
-                    if raw_name.startswith(('工具', '名称', '===', '---')):
-                        continue
-                    is_pinned = raw_name.startswith('📌')
-                    clean_name = raw_name.lstrip('📌').strip()
-                    if not clean_name or clean_name in seen:
-                        continue
-                    seen.add(clean_name)
-                    domain = parts[1].strip() if len(parts) > 1 else ''
-                    importance = 0
-                    try:
-                        importance = int(parts[2].strip()) if len(parts) > 2 else 0
-                    except Exception:
-                        pass
-                    rows.append({
-                        'bucket_id': clean_name,
-                        'name': clean_name,
-                        'content': '',
-                        'domain': domain,
-                        'importance': importance,
-                        'pinned': is_pinned,
-                        'resolved': False,
-                    })
-            return rows
+        def _fetch_buckets(cookie):
+            hdrs = {'Cookie': cookie} if cookie else {}
+            resp = _req.get(f'{ombre_url}/api/buckets', headers=hdrs, timeout=20)
+            return resp
 
         try:
-            all_buckets = []
-            for dr in date_ranges:
-                try:
-                    blocks = _mcp_catalog(dr)
-                    rows = _parse_catalog_blocks(blocks)
-                    all_buckets.extend(rows)
-                except Exception:
-                    pass
-            # 去重（按 bucket_id）
-            seen_ids: set = set()
-            deduped = []
-            for b in all_buckets:
-                bid = b.get('bucket_id') or b.get('name') or ''
-                if bid and bid not in seen_ids:
-                    seen_ids.add(bid)
-                    deduped.append(b)
-            return jsonify({'buckets': deduped, 'total': len(deduped)})
+            cookie = _ob_session_cookie['value']
+            if not cookie or (_time.time() - _ob_session_cookie['ts']) > 1800:
+                cookie = _do_login()
+
+            resp = _fetch_buckets(cookie or '')
+            if resp.status_code == 401:
+                cookie = _do_login()
+                if cookie is None:
+                    return jsonify({'error': 'ombre login failed'}), 502
+                resp = _fetch_buckets(cookie)
+
+            if resp.status_code >= 400:
+                return jsonify({'error': f'ombre buckets HTTP {resp.status_code}'}), 502
+
+            data = resp.json()
+            buckets = data if isinstance(data, list) else (data.get('buckets') or data.get('items') or [])
+            return jsonify({'buckets': buckets, 'total': len(buckets)})
+
         except Exception as e:
             return jsonify({'error': str(e)}), 502
 
