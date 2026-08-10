@@ -622,28 +622,49 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if lines:
                 reverie_text = '\n'.join(lines)
 
-        if guidance or breath_text or cron_text or reverie_text or mem_search_text or memory_instruction:
-            extra = ''
-            if mem_search_text:
-                extra += '\n\n[相关记忆检索结果]\n' + mem_search_text
-            if breath_text:
-                extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
-            if guidance:
-                extra += '\n\n[此刻说话方式]\n' + guidance
-            if reverie_text:
-                extra += '\n\n[小窝最近的对话记录]\n' + reverie_text
-            if memory_instruction:
-                extra += memory_instruction
+        # ── 稳定段（BP1，加 cache_control）vs 动态段（不缓存）──────────
+        # 稳定：原始人设 + 长期记忆（breath），几乎不变，可以缓存
+        # 动态：本轮记忆召回、小窝日志、花园日志、记忆指令，每轮都变，不挂标
+        stable_extra = ''
+        if breath_text:
+            stable_extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
+
+        volatile_extra = ''
+        if mem_search_text:
+            volatile_extra += '\n\n[相关记忆检索结果]\n' + mem_search_text
+        if guidance:
+            volatile_extra += '\n\n[此刻说话方式]\n' + guidance
+        if reverie_text:
+            volatile_extra += '\n\n[小窝最近的对话记录]\n' + reverie_text
+        if cron_text:
+            volatile_extra += '\n\n[花园动态]\n' + cron_text
+        if memory_instruction:
+            volatile_extra += memory_instruction
+
+        if stable_extra or volatile_extra:
             injected_systems = []
             found_system = False
             for m in messages:
                 if m.get('role') == 'system' and not found_system:
-                    injected_systems.append({**m, 'content': m['content'] + extra})
+                    # BP1：稳定 system block 挂 cache_control
+                    stable_content = m['content'] + stable_extra
+                    injected_systems.append({
+                        **m,
+                        'content': [{'type': 'text', 'text': stable_content,
+                                     'cache_control': {'type': 'ephemeral'}}]
+                    })
                     found_system = True
                 else:
                     injected_systems.append(m)
             if not found_system:
-                injected_systems = [{'role': 'system', 'content': extra.strip()}] + messages
+                injected_systems = [{
+                    'role': 'system',
+                    'content': [{'type': 'text', 'text': stable_extra.strip(),
+                                 'cache_control': {'type': 'ephemeral'}}]
+                }] + messages
+            # 动态内容单独作为第二个 system block（不挂标，不影响 BP1 缓存前缀）
+            if volatile_extra:
+                injected_systems.append({'role': 'system', 'content': volatile_extra.strip()})
             messages = injected_systems
 
         assembled, baseline, continuing = build_messages(messages, store, session_id, max_records, max_chars)
