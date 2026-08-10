@@ -609,7 +609,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if lines:
                 cron_text = '\n'.join(lines)
 
-        # 拉最近的小窝对话（reverie source），主动检测新消息注入
+        # ── 主动检测小窝新消息（reverie source）──────────────────────
+        # 每次Kelivo请求时对比上次seen的sequence，有新的就醒目提示，没有就静默背景
         reverie_text = ''
         if source != 'reverie':  # 只在非小窝请求时注入，避免重复
             reverie_logs = store.timeline_search_source('reverie', limit=6)
@@ -623,7 +624,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
 
                 # 找出新消息（sequence > last_seen_seq）
                 new_logs = [r for r in reverie_logs if r.get('sequence', 0) > last_seen_seq]
-                all_logs = reverie_logs
 
                 # 更新last_seen_seq为当前最新
                 max_seq = max((r.get('sequence', 0) for r in reverie_logs), default=0)
@@ -643,7 +643,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 else:
                     # 没有新消息：静默注入背景上下文
                     lines = []
-                    for rec in all_logs:
+                    for rec in reverie_logs:
                         role_label = '言言' if rec.get('role') == 'user' else '小克'
                         content = (rec.get('content') or '').strip()[:200]
                         if content:
@@ -664,7 +664,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if guidance:
             volatile_extra += '\n\n[此刻说话方式]\n' + guidance
         if reverie_text:
-            volatile_extra += '\n\n[小窝最近的对话记录]\n' + reverie_text
+            volatile_extra += '\n\n' + reverie_text
         if cron_text:
             volatile_extra += '\n\n[花园动态]\n' + cron_text
         if memory_instruction:
@@ -828,7 +828,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
 import re as _re_top
 
 def _process_hold_blocks(reply: str) -> tuple[str, list[dict]]:
-    """从回复里提取所有 <!--HOLD: ...--> 标记，返回 (清洗后回复, hold条目列表)。"""
+    """从回复里提取所有 <!--HOLD: ...-->  标记，返回 (清洗后回复, hold条目列表)。"""
     pattern = _re_top.compile(r'<!--HOLD:\s*(.+?)-->', _re_top.DOTALL)
     holds = []
     for m in pattern.finditer(reply):
