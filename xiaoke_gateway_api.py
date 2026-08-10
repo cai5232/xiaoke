@@ -596,7 +596,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 '请在回复末尾追加 <!--HOLD: 本轮最值得记录的信息-->。'
             )
 
-        breath_text = load_memories_text(max_count=30)
+        breath_text = get_breath_memories(max_results=20) or load_memories_text(max_count=30)
         guidance = None
 
         # 单独拉最近的花园日志（cron source），注入system prompt
