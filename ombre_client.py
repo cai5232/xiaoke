@@ -88,6 +88,17 @@ def _clean_memory_text(raw: str) -> str:
     return '\n'.join(lines).strip()
 
 
+def hold_memory(content: str, importance: int = 5, tags: str = '') -> bool:
+    """调用 OB hold 工具存一条记忆，成功返回 True。"""
+    if not OMBRE_URL or not (content or '').strip():
+        return False
+    args: dict = {'content': content.strip(), 'importance': importance}
+    if tags:
+        args['tags'] = tags
+    result = _call_mcp_tool('hold', args, timeout=12)
+    return result is not None
+
+
 def search_memories(query: str, max_results: int = 4) -> Optional[str]:
     """用 breath_search 搜索相关记忆，返回清洗后的文本，无结果返回 None。"""
     if not OMBRE_URL or not (query or '').strip():
