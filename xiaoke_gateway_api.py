@@ -496,6 +496,36 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         session_id = identity.session_id
         source = identity.source
 
+        # ── 记忆搜索 ────────────────────────────────────────────────
+        mem_search_text = ''
+        if user_text:
+            mem_result = search_memories(user_text, max_results=4)
+            if mem_result:
+                mem_search_text = mem_result
+
+        # ── turns_since_memory 计数 ──────────────────────────────────
+        tsm_key = f'tsm:{session_id or "default"}'
+        try:
+            turns_since_memory = int(_meta_get(tsm_key) or '0')
+        except Exception:
+            turns_since_memory = 0
+        force_hold = turns_since_memory >= 4  # 第5条强制存
+
+        # ── 记忆指令拼接 ─────────────────────────────────────────────
+        memory_instruction = (
+            '\n\n[记忆操作指令]\n'
+            '每条回复后，根据本轮对话自行判断是否值得存入长期记忆。\n'
+            '如果决定存入，在回复末尾单独一行追加：\n'
+            '[HOLD] 内容 | tags:标签 | importance:重要度(1-10)\n'
+            '（内容、tags、importance 都是可选填的，tags 和 importance 可不写）\n'
+            '如果决定不存入，不写任何 [HOLD] 标记即可，不要解释。'
+        )
+        if force_hold:
+            memory_instruction += (
+                '\n\n⚠️ 注意：你已连续 5 条没有主动存入记忆，本条必须存入一条，'
+                '请在回复末尾追加 [HOLD] 标记，内容是本轮对话最值得记录的信息。'
+            )
+
         breath_text = load_memories_text(max_count=30)
         guidance = None
 
