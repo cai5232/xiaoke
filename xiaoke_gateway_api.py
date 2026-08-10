@@ -608,9 +608,19 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     if completed:
                         reply = extract_stream_content(chunks_collected)
                         if reply.strip():
-                            store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
+                            clean_reply, hold_items = _process_hold_blocks(reply)
+                            if hold_items:
+                                for h in hold_items:
+                                    try:
+                                        hold_memory(h['content'], importance=h['importance'], tags=h['tags'])
+                                    except Exception:
+                                        pass
+                                _meta_set(tsm_key, '0')
+                            else:
+                                _meta_set(tsm_key, str(turns_since_memory + 1))
+                            store.completed_turn(user_text, clean_reply, source=source, user_created_at=received_at)
                             if baseline and not continuing:
-                                store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+                                store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, clean_reply)
 
                 return Response(generate_stream(), content_type='text/event-stream',
                               headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
