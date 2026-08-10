@@ -682,7 +682,44 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     return app
 
 
-def mock_sse_events(user_text, model, simulate_disconnect=False):
+import re as _re_top
+
+def _process_hold_blocks(reply: str) -> tuple[str, list[dict]]:
+    """从回复里提取所有 [HOLD] 行，返回 (清洗后回复, hold条目列表)。"""
+    pattern = _re_top.compile(r'^\[HOLD\]\s*(.+)
+    response_id = f'chatcmpl-xiaoke-mock-{uuid.uuid4().hex}'
+    words = ['[xiaoke local mock] ', 'received: ', user_text]
+    yield 'data: ' + json.dumps({'id': response_id, 'object': 'chat.completion.chunk', 'created': 0,
+                                  'model': model, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]}) + '\n\n'
+    for index, word in enumerate(words):
+        yield 'data: ' + json.dumps({'id': response_id, 'object': 'chat.completion.chunk', 'created': 0,
+                                      'model': model, 'choices': [{'index': 0, 'delta': {'content': word}, 'finish_reason': None}]}) + '\n\n'
+        if simulate_disconnect and index == 0:
+            return
+    yield 'data: ' + json.dumps({'id': response_id, 'object': 'chat.completion.chunk', 'created': 0,
+                                  'model': model, 'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}]}) + '\n\n'
+    yield 'data: [DONE]\n\n'
+, _re_top.MULTILINE)
+    holds = []
+    for m in pattern.finditer(reply):
+        raw = m.group(1).strip()
+        # 解析 content | tags:xxx | importance:N
+        parts = [p.strip() for p in raw.split('|')]
+        content = parts[0] if parts else raw
+        tags = ''
+        importance = 5
+        for p in parts[1:]:
+            if p.lower().startswith('tags:'):
+                tags = p[5:].strip()
+            elif p.lower().startswith('importance:'):
+                try:
+                    importance = max(1, min(10, int(p[11:].strip())))
+                except Exception:
+                    pass
+        if content:
+            holds.append({'content': content, 'tags': tags, 'importance': importance})
+    clean = pattern.sub('', reply).rstrip()
+    return clean, holds
     response_id = f'chatcmpl-xiaoke-mock-{uuid.uuid4().hex}'
     words = ['[xiaoke local mock] ', 'received: ', user_text]
     yield 'data: ' + json.dumps({'id': response_id, 'object': 'chat.completion.chunk', 'created': 0,
