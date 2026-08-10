@@ -626,9 +626,24 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     reply = choices[0].get('message', {}).get('content', '')
 
                 if reply.strip():
-                    store.completed_turn(user_text, reply, source=source, user_created_at=received_at)
+                    # 解析并处理 [HOLD] 块
+                    clean_reply, hold_items = _process_hold_blocks(reply)
+                    if hold_items:
+                        for h in hold_items:
+                            try:
+                                hold_memory(h['content'], importance=h['importance'], tags=h['tags'])
+                            except Exception:
+                                pass
+                        _meta_set(tsm_key, '0')
+                    else:
+                        _meta_set(tsm_key, str(turns_since_memory + 1))
+                    # 用清洗后的回复存 timeline 和返回给前端
+                    store.completed_turn(user_text, clean_reply, source=source, user_created_at=received_at)
                     if baseline and not continuing:
-                        store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, reply)
+                        store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, clean_reply)
+                    # 替换返回内容里的 choices
+                    if choices:
+                        upstream_response['choices'][0]['message']['content'] = clean_reply
                     # 如果是小窝的请求，推送通知给言言
                     if source == 'reverie':
                         import re as _re
