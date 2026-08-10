@@ -35,10 +35,49 @@ def _headers() -> dict[str, str]:
     return h
 
 
+def _inject_bp4(messages: list[dict]) -> list[dict]:
+    """在倒数第二条 user 消息上挂 BP4 cache_control（rolling 断点）。
+    把所有历史轮次纳入缓存范围，只有最后一条新输入不在缓存前缀里。
+    """
+    # 找倒数第二条 user 消息的 index
+    user_indices = [i for i, m in enumerate(messages) if m.get('role') == 'user']
+    if len(user_indices) < 2:
+        return messages  # 历史不足两条，不挂
+
+    target_idx = user_indices[-2]
+    result = []
+    for i, m in enumerate(messages):
+        if i != target_idx:
+            result.append(m)
+            continue
+        content = m.get('content', '')
+        if isinstance(content, str):
+            content = [{'type': 'text', 'text': content, 'cache_control': {'type': 'ephemeral'}}]
+        elif isinstance(content, list):
+            # 给最后一个 text block 挂标
+            content = list(content)
+            for j in range(len(content) - 1, -1, -1):
+                if content[j].get('type') == 'text':
+                    block = dict(content[j])
+                    block['cache_control'] = {'type': 'ephemeral'}
+                    content[j] = block
+                    break
+        result.append({**m, 'content': content})
+    return result
+
+
 def request_payload(messages: list[dict], model: str, stream: bool, request_options: dict | None = None) -> dict:
     """Rebuild a request after xiaoke has replaced its messages."""
     payload = dict(request_options or {})
-    payload.update({'model': model, 'messages': messages, 'stream': stream})
+    # BP4：rolling 断点，把全部历史纳入缓存
+    messages = _inject_bp4(messages)
+    payload.update({
+        'model': model,
+        'messages': messages,
+        'stream': stream,
+        # user_id：固定字符串，让上游 sticky 路由粘在同一个后端节点，缓存才能命中
+        'metadata': {'user_id': 'xiaoke-yanyan-stable'},
+    })
     return payload
 
 
