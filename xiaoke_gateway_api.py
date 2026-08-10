@@ -335,6 +335,75 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         send_push_notification(push_db, session_id, title, msg_body, url)
         return jsonify({'success': True})
 
+    # ── OB Dashboard 全量桶接口 ─────────────────────────────────────
+    _ob_session_cookie: dict = {'value': '', 'ts': 0.0}
+
+    @app.route('/internal/ombre-buckets', methods=['GET', 'OPTIONS'])
+    def ombre_buckets():
+        if request.method == 'OPTIONS':
+            r = Response('', 204)
+            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+            r.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+            return r
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+
+        import requests as _req
+        import time as _time
+        ombre_url = (os.environ.get('OMBRE_URL') or '').rstrip('/')
+        if not ombre_url:
+            return jsonify({'error': 'OMBRE_URL not configured'}), 503
+        dashboard_password = os.environ.get('OMBRE_DASHBOARD_PASSWORD', '')
+
+        def _do_login():
+            resp = _req.post(
+                f'{ombre_url}/auth/login',
+                json={'password': dashboard_password},
+                headers={'Content-Type': 'application/json'},
+                timeout=10,
+            )
+            if resp.status_code >= 400:
+                return None
+            cookie = ''
+            sc = resp.headers.get('set-cookie', '')
+            if sc:
+                cookie = sc.split(';')[0]
+            _ob_session_cookie['value'] = cookie
+            _ob_session_cookie['ts'] = _time.time()
+            return cookie
+
+        def _fetch_buckets(cookie):
+            hdrs = {'Cookie': cookie} if cookie else {}
+            resp = _req.get(f'{ombre_url}/api/buckets', headers=hdrs, timeout=20)
+            return resp
+
+        try:
+            cookie = _ob_session_cookie['value']
+            # cookie超过30分钟强制重新登录
+            if not cookie or (_time.time() - _ob_session_cookie['ts']) > 1800:
+                cookie = _do_login()
+
+            resp = _fetch_buckets(cookie or '')
+            # 401就重新登录再试一次
+            if resp.status_code == 401:
+                cookie = _do_login()
+                if cookie is None:
+                    return jsonify({'error': 'ombre login failed'}), 502
+                resp = _fetch_buckets(cookie)
+
+            if resp.status_code >= 400:
+                return jsonify({'error': f'ombre buckets HTTP {resp.status_code}'}), 502
+
+            data = resp.json()
+            buckets = data if isinstance(data, list) else (data.get('buckets') or data.get('items') or [])
+            return jsonify({'buckets': buckets, 'total': len(buckets)})
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 502
+
     @app.route('/internal/mcp-proxy', methods=['POST', 'OPTIONS'])
     def mcp_proxy():
         """代理 MCP HTTP 请求，解决前端 CORS 问题。
