@@ -11,7 +11,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from mock_gateway import assemble
-from ombre_client import get_breath_memories
+from ombre_client import get_breath_memories, search_memories
 from memory_store import load_memories_text, save_memory
 from storage import TimelineStore, utcnow
 from coreading import stage as coreading_stage, deliver as coreading_deliver
