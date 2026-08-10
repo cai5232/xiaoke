@@ -115,10 +115,8 @@ def search_memories(query: str, max_results: int = 4) -> Optional[str]:
     return cleaned if len(cleaned) >= 15 else None
 
 
-def get_breath_memories(max_results: int = 15) -> Optional[str]:
+def get_breath_memories(max_results: int = 20) -> Optional[str]:
     """调用 OB breath 工具，返回格式化的记忆文本，失败返回 None。"""
-    # MCP协议调试中，暂时禁用避免阻塞
-    return None
     if not OMBRE_URL:
         return None
     try:
