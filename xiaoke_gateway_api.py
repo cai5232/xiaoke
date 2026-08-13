@@ -616,7 +616,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         # 每次Kelivo请求时对比上次seen的sequence，有新的就醒目提示，没有就静默背景
         reverie_text = ''
         if source != 'reverie':  # 只在非小窝请求时注入，避免重复
-            reverie_logs = store.timeline_search_source('reverie', limit=6)
+            reverie_logs = store.timeline_search_source('reverie', limit=12)
             if reverie_logs:
                 # 读上次Kelivo这边看到的最大sequence
                 last_seen_key = 'reverie_last_seen_seq'
