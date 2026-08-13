@@ -628,10 +628,10 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 # 找出新消息（sequence > last_seen_seq）
                 new_logs = [r for r in reverie_logs if r.get('sequence', 0) > last_seen_seq]
 
-                # 更新last_seen_seq为当前最新
+                # 延迟更新last_seen_seq：先注入，回复完成后再标记seen
                 max_seq = max((r.get('sequence', 0) for r in reverie_logs), default=0)
-                if max_seq > last_seen_seq:
-                    _meta_set(last_seen_key, str(max_seq))
+                # 把max_seq暂存，等completed_turn之后再写入
+                _reverie_pending_seq = max_seq if max_seq > last_seen_seq else None
 
                 if new_logs:
                     # 有新消息：用醒目格式，提示我主动提起
