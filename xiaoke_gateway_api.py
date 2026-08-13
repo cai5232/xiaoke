@@ -213,7 +213,10 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             r.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
             r.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
             return r
-        r = jsonify({"object":"list","data":[{"id":"[Kiro] claude-sonnet-4-6-thinking [不补]","object":"model","created":0,"owned_by":"xiaoke"}]})
+        raw = os.environ.get('XIAOKE_MODELS', '[Kiro] claude-sonnet-4-6-thinking [不补]')
+        model_ids = [m.strip() for m in raw.split(',') if m.strip()]
+        data = [{"id": mid, "object": "model", "created": 0, "owned_by": "xiaoke"} for mid in model_ids]
+        r = jsonify({"object": "list", "data": data})
         r.headers['Access-Control-Allow-Origin'] = '*'
         return r
 
