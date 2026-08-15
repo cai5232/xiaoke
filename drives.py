@@ -52,6 +52,12 @@ QUIET_START, QUIET_END = 16, 0  # UTC hours, i.e. 00:00-08:00 Beijing time
 OFFLINE_GRACE_HOURS = 1.0       # under an hour of silence is not really away
 SINGLE_BOOST_CAP = 0.35         # max bump one message can give one drive
 
+# How many user messages to collect before spending one model call on them.
+# 1 = score every message (old behaviour). 3 = score once per three messages.
+LLM_INTERVAL = max(1, int(os.environ.get('DRIVES_LLM_INTERVAL', '3') or 3))
+# Messages in between still move the drives, just weaker and by keywords only.
+INTERIM_RULE_SCALE = 0.5
+
 
 def _clamp(v: float) -> float:
     return max(0.0, min(1.0, v))
