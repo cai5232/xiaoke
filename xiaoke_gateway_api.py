@@ -17,6 +17,7 @@ from storage import TimelineStore, utcnow
 from coreading import stage as coreading_stage, deliver as coreading_deliver
 from timeline_context import TimelineRecord, rolling_records, text_from_content
 from window_identity import identify_window, new_session_id
+from drives import DriveEngine, prompt_block as drives_prompt_block
 
 DEFAULT_DB = Path(__file__).resolve().parent / 'data' / 'xiaoke.sqlite'
 DEFAULT_HANDOFF_RECORDS = 66
