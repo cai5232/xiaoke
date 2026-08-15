@@ -253,11 +253,15 @@ class DriveEngine:
 
         deltas: dict[str, float] = {}
         method = 'none'
-        if text and use_model:
-            model_deltas = analyze_by_model(text)
-            if model_deltas is not None:
-                deltas = model_deltas
-                method = 'model' if model_deltas else 'model-empty'
+        if text:
+            if use_model:
+                model_deltas = analyze_by_model(text)
+                if model_deltas is not None:
+                    deltas = model_deltas
+                    method = 'model'
+            if not deltas:
+                deltas = analyze_by_rules(text)
+                method = 'rules' if method == 'none' else 'model-empty+rules'
 
         spread: dict[str, float] = {}
         for name, amount in deltas.items():
