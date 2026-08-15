@@ -255,6 +255,23 @@ class DriveEngine:
         return self._decay(values, (now - updated_at) / 3600.0,
                            (now - last_seen_at) / 3600.0)
 
+    def _push_pending(self, text: str) -> list[str]:
+        """Buffer one message; return all buffered texts (oldest first)."""
+        conn = self._conn()
+        conn.execute('INSERT INTO drive_pending (created_at, text) VALUES (?, ?)',
+                     (time.time(), text[:1500]))
+        conn.commit()
+        rows = conn.execute(
+            'SELECT text FROM drive_pending ORDER BY id ASC').fetchall()
+        conn.close()
+        return [r[0] for r in rows]
+
+    def _clear_pending(self):
+        conn = self._conn()
+        conn.execute('DELETE FROM drive_pending')
+        conn.commit()
+        conn.close()
+
     def observe(self, text: str, use_model: bool = True) -> dict[str, Any]:
         """Handle one new user message: decay, analyse, bump, persist."""
         values, updated_at, last_seen_at = self._read_raw()
