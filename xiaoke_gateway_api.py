@@ -653,6 +653,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             volatile_extra += '\n\n' + reverie_text
         if cron_text:
             volatile_extra += '\n\n[花园动态]\n' + cron_text
+        if drives_text:
+            volatile_extra += '\n\n' + drives_text
         if memory_instruction:
             volatile_extra += memory_instruction
 
