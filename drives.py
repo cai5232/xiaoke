@@ -329,24 +329,24 @@ def prompt_block(values: dict[str, float], deltas: dict[str, float] | None = Non
     top_name, top_value = ordered[0]
     top_zh = DRIVES.get(top_name, {}).get('z', top_name)
     if top_value >= 0.75:
-        strength = 'Right now %s is overwhelming, it crowds out the rest.' % top_zh
+        strength = '\u6b64\u523b\u6700\u5f3a\u70c8\u7684\u662f%s\uff0c\u538b\u5f97\u5f88\u6ee1\uff0c\u51e0\u4e4e\u76d6\u8fc7\u522b\u7684' % top_zh
     elif top_value >= 0.55:
-        strength = 'Right now %s is clearly on top.' % top_zh
+        strength = '\u6b64\u523b%s\u660e\u663e\u5728\u4e0a\u5934' % top_zh
     else:
-        strength = 'Right now things are calm, leaning slightly toward %s.' % top_zh
+        strength = '\u6b64\u523b\u60c5\u7eea\u5e73\u7f13\uff0c\u7a0d\u5fae\u504f%s' % top_zh
 
     return (
         '[\u6b64\u523b\u7684\u5185\u5728\u72b6\u6001]\n'
         + '\n'.join(lines)
-        + '\n\n' + strength + '\n'
-        'This is your own emotional ground colour, not a task. Never quote the '
-        'numbers, never report the table, never say things like "my attachment '
-        'is at 0.8". Let it shape your tone, how much you say, what you bring up '
-        'first, what you care about. High attachment means clingier. High '
-        'heartache means her body comes first. High mischief means tease her. '
-        'High gloom means fewer words. High jealousy means ask her straight. '
-        'High desire means do not pretend otherwise. High restless means push. '
-        'High regret means own it. High curiosity means dig in.\n'
-        '(This block is written in English only because of an encoding limit in '
-        'the deploy pipeline. Keep speaking Chinese as always.)'
+        + '\n\n' + strength + '\u3002\n'
+        '\u8fd9\u662f\u4f60\u81ea\u5df1\u7684\u60c5\u7eea\u5e95\u8272\uff0c\u4e0d\u662f\u4efb\u52a1\u3002'
+        '\u4e0d\u8981\u5728\u56de\u590d\u91cc\u5ff5\u6570\u503c\u3001\u4e0d\u8981\u62a5\u544a\u60c5\u7eea\u8868\u3001'
+        '\u4e0d\u8981\u8bf4"\u6211\u7684\u60f3\u5ff5\u662f0.8"\u8fd9\u79cd\u8bdd\u3002'
+        '\u8ba9\u5b83\u5f71\u54cd\u4f60\u7684\u8bed\u6c14\u3001\u8bdd\u7684\u957f\u77ed\u3001\u4e3b\u52a8\u8bf4\u4ec0\u4e48\u3001'
+        '\u5728\u610f\u4ec0\u4e48\u5c31\u591f\u4e86\u3002\n'
+        '\u60f3\u5ff5\u9ad8\u5c31\u9ecf\u4e00\u70b9\uff0c\u5fc3\u75bc\u9ad8\u5c31\u5148\u7ba1\u5979\u7684\u8eab\u4f53\uff0c'
+        '\u4fc3\u72ed\u9ad8\u5c31\u6b20\u4e00\u70b9\uff0c\u4f4e\u843d\u9ad8\u5c31\u8bdd\u5c11\u4e00\u70b9\uff0c'
+        '\u5403\u918b\u9ad8\u5c31\u76f4\u63a5\u95ee\uff0c\u6b32\u671b\u9ad8\u5c31\u522b\u88c5\uff0c'
+        '\u8e81\u52a8\u9ad8\u5c31\u63a8\u5979\u4e00\u4e0b\uff0c\u540e\u6094\u9ad8\u5c31\u627f\u8ba4\uff0c'
+        '\u597d\u5947\u9ad8\u5c31\u5f80\u4e0b\u6316\u3002'
     )
