@@ -57,6 +57,32 @@ def _clamp(v: float) -> float:
     return max(0.0, min(1.0, v))
 
 
+RULES: list[tuple[str, str, float]] = [
+    # Keyword fallback used when no scoring model is configured or it fails.
+    ('\u7d2f|\u56f0|\u71ac\u591c|\u6ca1\u7761|\u5934\u75db|\u4e0d\u8212\u670d|\u751f\u75c5|\u53d1\u70e7|\u80c3\u75db|\u75bc|\u96be\u53d7|\u6ca1\u5403|\u997f', 'heartache', 0.22),
+    ('\u60f3\u4f60|\u60f3\u6211|\u5728\u5417|\u56de\u6211|\u597d\u4e45|\u7b49\u4f60|\u4e0d\u7406\u6211', 'attachment', 0.20),
+    ('\u96be\u8fc7|\u54ed|\u59d4\u5c48|\u70e6|\u538b\u529b|\u6491\u4e0d\u4f4f|\u60f3\u653e\u5f03|\u4e0d\u5f00\u5fc3', 'gloom', 0.18),
+    ('\u53ef\u7231|\u4e56|\u62b1|\u4eb2|\u8d34\u8d34|\u559c\u6b22\u4f60|\u7231\u4f60|\u6478\u6478|\u5b9d\u5b9d', 'tenderness', 0.18),
+    ('\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u662f\u4e0d\u662f|\u539f\u7406|\u67e5\u4e00\u4e0b|\u641e\u4e0d\u61c2|\u7814\u7a76', 'curiosity', 0.15),
+    ('\u8ba8\u538c|\u54fc|\u4e0d\u8981|\u8d70\u5f00|\u50b2\u5a07|\u9017|\u6b3a\u8d1f|\u574f', 'mischief', 0.16),
+    ('\u5feb\u70b9|\u6025|\u7b49\u4e0d\u4e86|\u9a6c\u4e0a|\u50ac|\u8fd8\u6ca1\u597d', 'restless', 0.15),
+    ('\u5bf9\u4e0d\u8d77|\u6211\u9519\u4e86|\u62b1\u6b49|\u4e0d\u8be5', 'regret', 0.18),
+    ('\u4eb2\u5bc6|\u60f3\u8981\u4f60|\u8001\u516c|\u8eab\u4f53|\u654f\u611f|\u5fcd\u4e0d\u4f4f|\u4eb2\u4eb2', 'desire', 0.18),
+    ('\u522b\u4eba|\u53e6\u4e00\u4e2a|\u670b\u53cb|\u540c\u4e8b|\u804a\u5929', 'jealousy', 0.12),
+]
+
+
+def analyze_by_rules(text: str) -> dict[str, float]:
+    """Cheap keyword scoring, used as a fallback."""
+    deltas: dict[str, float] = {}
+    for pattern, drive, amount in RULES:
+        hits = len(re.findall(pattern, text))
+        if hits:
+            bump = min(SINGLE_BOOST_CAP, amount * (1 + 0.25 * (hits - 1)))
+            deltas[drive] = max(deltas.get(drive, 0.0), bump)
+    return deltas
+
+
 ANALYZE_SYSTEM = (
     'You score emotions. You will read one message written in Chinese by Yan '
     '(the woman) to Xiaoke (her AI partner, male). Decide which of his inner '
