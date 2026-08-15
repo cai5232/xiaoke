@@ -282,12 +282,28 @@ class DriveEngine:
         deltas: dict[str, float] = {}
         method = 'none'
         if text:
-            if use_model:
+            pending = self._push_pending(text) if use_model and LLM_INTERVAL > 1 else [text]
+            if use_model and len(pending) >= LLM_INTERVAL:
+                # Score the whole batch in one model call.
+                joined = '\n---\n'.join(pending)
+                model_deltas = analyze_by_model(joined)
+                if model_deltas is not None:
+                    deltas = model_deltas
+                    method = 'model-batch%d' % len(pending)
+                    self._clear_pending()
+                else:
+                    self._clear_pending()
+            elif use_model and LLM_INTERVAL > 1:
+                # In-between message: keywords only, at reduced strength.
+                deltas = {k: v * INTERIM_RULE_SCALE
+                          for k, v in analyze_by_rules(text).items()}
+                method = 'rules-interim' if deltas else 'interim-idle'
+            elif use_model:
                 model_deltas = analyze_by_model(text)
                 if model_deltas is not None:
                     deltas = model_deltas
                     method = 'model'
-            if not deltas:
+            if not deltas and method in ('none', 'model'):
                 deltas = analyze_by_rules(text)
                 method = 'rules' if method == 'none' else 'model-empty+rules'
 
