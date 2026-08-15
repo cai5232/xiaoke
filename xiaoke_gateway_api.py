@@ -167,6 +167,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     db_path = Path(db_path)
     push_db = _push_db_path(db_path)
     _init_push_db(push_db)
+    drive_engine = DriveEngine(db_path.parent / 'drives.sqlite')
     max_records = max_handoff_records if max_handoff_records is not None else int(os.environ.get("MAX_HANDOFF_RECORDS", DEFAULT_HANDOFF_RECORDS))
     max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
     required_api_key = api_key if api_key is not None else os.environ.get("XIAOKE_API_KEY", "")
