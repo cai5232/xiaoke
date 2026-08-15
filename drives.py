@@ -90,8 +90,11 @@ def analyze_by_rules(text: str) -> dict[str, float]:
 
 
 ANALYZE_SYSTEM = (
-    'You score emotions. You will read one message written in Chinese by Yan '
-    '(the woman) to Xiaoke (her AI partner, male). Decide which of his inner '
+    'You score emotions. You will read one or more consecutive messages '
+    'written in Chinese by Yan (the woman) to Xiaoke (her AI partner, male). '
+    'Multiple messages are separated by a line containing only ---; treat them '
+    'as one short stretch of conversation and score the overall effect. '
+    'Decide which of his inner '
     'drives the message stirs, and how strongly.\n'
     'Drives: attachment, tenderness, heartache, curiosity, mischief, restless, '
     'regret, desire, gloom, jealousy.\n'
