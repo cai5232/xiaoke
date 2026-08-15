@@ -9,8 +9,8 @@ Notes
 - Every incoming user message calls observe(), which analyses the text with a
   cheap model, bumps the matching drives, and stores the result. prompt_block()
   then renders the state for injection into the system prompt.
-- ASCII-only source on purpose: the deploy pipeline currently rejects non-ASCII
-  payloads, so Chinese labels are written as escape sequences.
+- ASCII-escaped source on purpose: the deploy pipeline currently rejects raw
+  non-ASCII payloads, so Chinese strings are written as \\uXXXX escapes.
 """
 from __future__ import annotations
 
