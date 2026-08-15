@@ -190,6 +190,11 @@ class DriveEngine:
             drives_json TEXT,
             note TEXT
         )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS drive_pending (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at REAL NOT NULL,
+            text TEXT NOT NULL
+        )''')
         if not conn.execute('SELECT 1 FROM drive_state WHERE id = 1').fetchone():
             now = time.time()
             initial = {name: cfg['b'] for name, cfg in DRIVES.items()}
