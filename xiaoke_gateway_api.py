@@ -568,6 +568,14 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         session_id = identity.session_id
         source = identity.source
 
+        drives_text = ''
+        try:
+            drive_result = drive_engine.observe(user_text)
+            drives_text = drives_prompt_block(drive_result['drives'],
+                                              drive_result['deltas'])
+        except Exception:
+            pass
+
         # ── 记忆搜索 ────────────────────────────────────────────────
         mem_search_text = ''
         if user_text:
