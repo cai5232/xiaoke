@@ -6,9 +6,11 @@ Notes
 - Decay is lazy: no background thread. Whenever we read the state we work out
   how long it has been since the last update and apply decay for that gap.
   This survives Zeabur restarts and sleeps without drifting.
-- Every incoming user message calls observe(), which analyses the text with a
-  cheap model, bumps the matching drives, and stores the result. prompt_block()
-  then renders the state for injection into the system prompt.
+- Every incoming user message calls observe(). Messages are buffered and sent to
+  the cheap scoring model once every DRIVES_LLM_INTERVAL messages (default 3);
+  the messages in between are scored by keywords only, at half strength. The
+  matching drives are bumped and stored. prompt_block() then renders the state
+  for injection into the system prompt.
 - ASCII-escaped source on purpose: the deploy pipeline currently rejects raw
   non-ASCII payloads, so Chinese strings are written as \\uXXXX escapes.
 """
