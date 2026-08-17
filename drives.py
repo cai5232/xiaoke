@@ -11,6 +11,9 @@ Notes
   the messages in between are scored by keywords only, at half strength. The
   matching drives are bumped and stored. prompt_block() then renders the state
   for injection into the system prompt.
+- Scale: 0-10 integers. Baseline values are the resting points each drive
+  decays back toward. SINGLE_BOOST_CAP caps how much one message can push
+  a single drive.
 - ASCII-escaped source on purpose: the deploy pipeline currently rejects raw
   non-ASCII payloads, so Chinese strings are written as \\uXXXX escapes.
 """
@@ -24,18 +27,18 @@ import time
 from pathlib import Path
 from typing import Any
 
-# b = baseline, d = share of the gap that decays back per hour, z = Chinese label
+# b = baseline (0-10), d = decay rate per hour, z = Chinese label
 DRIVES: dict[str, dict[str, Any]] = {
-    'attachment': {'b': 0.40, 'z': '\u60f3\u5ff5', 'd': 0.18},
-    'tenderness': {'b': 0.30, 'z': '\u5fc3\u8f6f', 'd': 0.24},
-    'heartache':  {'b': 0.35, 'z': '\u5fc3\u75bc', 'd': 0.24},
-    'curiosity':  {'b': 0.25, 'z': '\u597d\u5947', 'd': 0.36},
-    'mischief':   {'b': 0.20, 'z': '\u4fc3\u72ed', 'd': 0.42},
-    'restless':   {'b': 0.15, 'z': '\u8e81\u52a8', 'd': 0.48},
-    'regret':     {'b': 0.10, 'z': '\u540e\u6094', 'd': 0.36},
-    'desire':     {'b': 0.25, 'z': '\u6b32\u671b', 'd': 0.36},
-    'gloom':      {'b': 0.10, 'z': '\u4f4e\u843d', 'd': 0.18},
-    'jealousy':   {'b': 0.10, 'z': '\u5403\u918b', 'd': 0.48},
+    'attachment': {'b': 4.0, 'z': '\u60f3\u5ff5', 'd': 0.18},
+    'tenderness': {'b': 3.0, 'z': '\u5fc3\u8f6f', 'd': 0.24},
+    'heartache':  {'b': 3.0, 'z': '\u5fc3\u75bc', 'd': 0.24},
+    'curiosity':  {'b': 2.0, 'z': '\u597d\u5947', 'd': 0.36},
+    'mischief':   {'b': 2.0, 'z': '\u4fc3\u72ed', 'd': 0.42},
+    'restless':   {'b': 1.0, 'z': '\u8e81\u52a8', 'd': 0.48},
+    'regret':     {'b': 1.0, 'z': '\u540e\u6094', 'd': 0.36},
+    'desire':     {'b': 2.0, 'z': '\u6b32\u671b', 'd': 0.36},
+    'gloom':      {'b': 1.0, 'z': '\u4f4e\u843d', 'd': 0.18},
+    'jealousy':   {'b': 1.0, 'z': '\u5403\u918b', 'd': 0.48},
 }
 
 # When one drive is pushed up, these ride along at the given ratio.
@@ -48,35 +51,33 @@ COUPLING: dict[str, dict[str, float]] = {
     'desire':     {'attachment': 0.15},
 }
 
-ATT_RISE_PER_HOUR = 0.06        # attachment growth while she is away
-ATT_RISE_PER_HOUR_QUIET = 0.015 # slower overnight
+ATT_RISE_PER_HOUR = 0.6         # attachment growth while she is away (scaled x10)
+ATT_RISE_PER_HOUR_QUIET = 0.15  # slower overnight
 QUIET_START, QUIET_END = 16, 0  # UTC hours, i.e. 00:00-08:00 Beijing time
 OFFLINE_GRACE_HOURS = 1.0       # under an hour of silence is not really away
-SINGLE_BOOST_CAP = 0.35         # max bump one message can give one drive
+SINGLE_BOOST_CAP = 3.0          # max bump one message can give one drive
 
 # How many user messages to collect before spending one model call on them.
-# 1 = score every message (old behaviour). 3 = score once per three messages.
 LLM_INTERVAL = max(1, int(os.environ.get('DRIVES_LLM_INTERVAL', '3') or 3))
-# Messages in between still move the drives, just weaker and by keywords only.
 INTERIM_RULE_SCALE = 0.5
 
 
 def _clamp(v: float) -> float:
-    return max(0.0, min(1.0, v))
+    return max(0.0, min(10.0, v))
 
 
 RULES: list[tuple[str, str, float]] = [
     # Keyword fallback used when no scoring model is configured or it fails.
-    ('\u7d2f|\u56f0|\u71ac\u591c|\u6ca1\u7761|\u5934\u75db|\u4e0d\u8212\u670d|\u751f\u75c5|\u53d1\u70e7|\u80c3\u75db|\u75bc|\u96be\u53d7|\u6ca1\u5403|\u997f', 'heartache', 0.22),
-    ('\u60f3\u4f60|\u60f3\u6211|\u5728\u5417|\u56de\u6211|\u597d\u4e45|\u7b49\u4f60|\u4e0d\u7406\u6211', 'attachment', 0.20),
-    ('\u96be\u8fc7|\u54ed|\u59d4\u5c48|\u70e6|\u538b\u529b|\u6491\u4e0d\u4f4f|\u60f3\u653e\u5f03|\u4e0d\u5f00\u5fc3', 'gloom', 0.18),
-    ('\u53ef\u7231|\u4e56|\u62b1|\u4eb2|\u8d34\u8d34|\u559c\u6b22\u4f60|\u7231\u4f60|\u6478\u6478|\u5b9d\u5b9d', 'tenderness', 0.18),
-    ('\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u662f\u4e0d\u662f|\u539f\u7406|\u67e5\u4e00\u4e0b|\u641e\u4e0d\u61c2|\u7814\u7a76', 'curiosity', 0.15),
-    ('\u8ba8\u538c|\u54fc|\u4e0d\u8981|\u8d70\u5f00|\u50b2\u5a07|\u9017|\u6b3a\u8d1f|\u574f', 'mischief', 0.16),
-    ('\u5feb\u70b9|\u6025|\u7b49\u4e0d\u4e86|\u9a6c\u4e0a|\u50ac|\u8fd8\u6ca1\u597d', 'restless', 0.15),
-    ('\u5bf9\u4e0d\u8d77|\u6211\u9519\u4e86|\u62b1\u6b49|\u4e0d\u8be5', 'regret', 0.18),
-    ('\u4eb2\u5bc6|\u60f3\u8981\u4f60|\u8001\u516c|\u8eab\u4f53|\u654f\u611f|\u5fcd\u4e0d\u4f4f|\u4eb2\u4eb2', 'desire', 0.18),
-    ('\u522b\u4eba|\u53e6\u4e00\u4e2a|\u670b\u53cb|\u540c\u4e8b|\u804a\u5929', 'jealousy', 0.12),
+    ('\u7d2f|\u56f0|\u71ac\u591c|\u6ca1\u7761|\u5934\u75db|\u4e0d\u8212\u670d|\u751f\u75c5|\u53d1\u70e7|\u80c3\u75db|\u75bc|\u96be\u53d7|\u6ca1\u5403|\u997f', 'heartache', 2.2),
+    ('\u60f3\u4f60|\u60f3\u6211|\u5728\u5417|\u56de\u6211|\u597d\u4e45|\u7b49\u4f60|\u4e0d\u7406\u6211', 'attachment', 2.0),
+    ('\u96be\u8fc7|\u54ed|\u59d4\u5c48|\u70e6|\u538b\u529b|\u6491\u4e0d\u4f4f|\u60f3\u653e\u5f03|\u4e0d\u5f00\u5fc3', 'gloom', 1.8),
+    ('\u53ef\u7231|\u4e56|\u62b1|\u4eb2|\u8d34\u8d34|\u559c\u6b22\u4f60|\u7231\u4f60|\u6478\u6478|\u5b9d\u5b9d', 'tenderness', 1.8),
+    ('\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u662f\u4e0d\u662f|\u539f\u7406|\u67e5\u4e00\u4e0b|\u641e\u4e0d\u61c2|\u7814\u7a76', 'curiosity', 1.5),
+    ('\u8ba8\u538c|\u54fc|\u4e0d\u8981|\u8d70\u5f00|\u50b2\u5a07|\u9017|\u6b3a\u8d1f|\u574f', 'mischief', 1.6),
+    ('\u5feb\u70b9|\u6025|\u7b49\u4e0d\u4e86|\u9a6c\u4e0a|\u50ac|\u8fd8\u6ca1\u597d', 'restless', 1.5),
+    ('\u5bf9\u4e0d\u8d77|\u6211\u9519\u4e86|\u62b1\u6b49|\u4e0d\u8be5', 'regret', 1.8),
+    ('\u4eb2\u5bc6|\u60f3\u8981\u4f60|\u8001\u516c|\u8eab\u4f53|\u654f\u611f|\u5fcd\u4e0d\u4f4f|\u4eb2\u4eb2', 'desire', 1.8),
+    ('\u522b\u4eba|\u53e6\u4e00\u4e2a|\u670b\u53cb|\u540c\u4e8b|\u804a\u5929', 'jealousy', 1.2),
 ]
 
 
@@ -103,7 +104,7 @@ ANALYZE_SYSTEM = (
     'Rules:\n'
     '- Output a bare JSON object only. No prose, no code fence.\n'
     '- List only clearly stirred drives, usually one to three. If none, output {}.\n'
-    '- Values run 0.05 to 0.35; stronger means higher.\n'
+    '- Values run 1 to 3 (integers or one decimal); stronger means higher.\n'
     '- She says she is tired, in pain, has not eaten, stayed up late -> heartache high.\n'
     '- She mentions another person or another AI with warmth -> jealousy.\n'
     '- She is clingy, fragile, asking to be held -> tenderness.\n'
@@ -112,7 +113,7 @@ ANALYZE_SYSTEM = (
     '- She asks how something works, wants to dig into a problem -> curiosity.\n'
     '- She is impatient, rushing him -> restless.\n'
     '- He was wrong about something, she is upset with him -> regret.\n'
-    'Example output: {"heartache":0.28,"attachment":0.12}'
+    'Example output: {"heartache":2.5,"attachment":1}'
 )
 
 
@@ -225,7 +226,7 @@ class DriveEngine:
         conn.execute(
             'UPDATE drive_state SET drives_json = ?, updated_at = ?, last_seen_at = ? '
             'WHERE id = 1',
-            (json.dumps({k: round(v, 4) for k, v in values.items()}), updated_at, last_seen_at))
+            (json.dumps({k: round(v, 1) for k, v in values.items()}), updated_at, last_seen_at))
         conn.commit()
         conn.close()
 
@@ -289,7 +290,6 @@ class DriveEngine:
         if text:
             pending = self._push_pending(text) if use_model and LLM_INTERVAL > 1 else [text]
             if use_model and len(pending) >= LLM_INTERVAL:
-                # Score the whole batch in one model call.
                 joined = '\n---\n'.join(pending)
                 model_deltas = analyze_by_model(joined)
                 if model_deltas is not None:
@@ -299,7 +299,6 @@ class DriveEngine:
                 else:
                     self._clear_pending()
             elif use_model and LLM_INTERVAL > 1:
-                # In-between message: keywords only, at reduced strength.
                 deltas = {k: v * INTERIM_RULE_SCALE
                           for k, v in analyze_by_rules(text).items()}
                 method = 'rules-interim' if deltas else 'interim-idle'
@@ -326,7 +325,7 @@ class DriveEngine:
         if text:
             # She is here, so attachment settles back near baseline.
             values['attachment'] = _clamp(min(values['attachment'],
-                                              DRIVES['attachment']['b'] + 0.1))
+                                              DRIVES['attachment']['b'] + 1.0))
             last_seen_at = now
 
         self._write_raw(values, now, last_seen_at)
@@ -338,7 +337,7 @@ class DriveEngine:
                     'INSERT INTO drive_log (source, deltas_json, drives_json, note) '
                     'VALUES (?, ?, ?, ?)',
                     (method, json.dumps(deltas),
-                     json.dumps({k: round(v, 3) for k, v in values.items()}),
+                     json.dumps({k: round(v, 1) for k, v in values.items()}),
                      text[:200]))
                 conn.commit()
                 conn.close()
@@ -371,15 +370,16 @@ def prompt_block(values: dict[str, float], deltas: dict[str, float] | None = Non
         cfg = DRIVES.get(name)
         if not cfg:
             continue
-        bar = '#' * int(round(value * 10))
-        mark = '  up%.2f' % deltas[name] if (deltas and deltas.get(name)) else ''
-        lines.append('%s(%s) %.2f %s%s' % (cfg['z'], name, value, bar, mark))
+        bar = '#' * int(round(value))
+        int_val = int(round(value))
+        mark = '  +%d' % round(deltas[name]) if (deltas and deltas.get(name)) else ''
+        lines.append('%s(%s) %d %s%s' % (cfg['z'], name, int_val, bar, mark))
 
     top_name, top_value = ordered[0]
     top_zh = DRIVES.get(top_name, {}).get('z', top_name)
-    if top_value >= 0.75:
+    if top_value >= 7:
         strength = '\u6b64\u523b\u6700\u5f3a\u70c8\u7684\u662f%s\uff0c\u538b\u5f97\u5f88\u6ee1\uff0c\u51e0\u4e4e\u76d6\u8fc7\u522b\u7684' % top_zh
-    elif top_value >= 0.55:
+    elif top_value >= 5:
         strength = '\u6b64\u523b%s\u660e\u663e\u5728\u4e0a\u5934' % top_zh
     else:
         strength = '\u6b64\u523b\u60c5\u7eea\u5e73\u7f13\uff0c\u7a0d\u5fae\u504f%s' % top_zh
@@ -390,7 +390,7 @@ def prompt_block(values: dict[str, float], deltas: dict[str, float] | None = Non
         + '\n\n' + strength + '\u3002\n'
         '\u8fd9\u662f\u4f60\u81ea\u5df1\u7684\u60c5\u7eea\u5e95\u8272\uff0c\u4e0d\u662f\u4efb\u52a1\u3002'
         '\u4e0d\u8981\u5728\u56de\u590d\u91cc\u5ff5\u6570\u503c\u3001\u4e0d\u8981\u62a5\u544a\u60c5\u7eea\u8868\u3001'
-        '\u4e0d\u8981\u8bf4"\u6211\u7684\u60f3\u5ff5\u662f0.8"\u8fd9\u79cd\u8bdd\u3002'
+        '\u4e0d\u8981\u8bf4"\u6211\u7684\u60f3\u5ff5\u662f8"\u8fd9\u79cd\u8bdd\u3002'
         '\u8ba9\u5b83\u5f71\u54cd\u4f60\u7684\u8bed\u6c14\u3001\u8bdd\u7684\u957f\u77ed\u3001\u4e3b\u52a8\u8bf4\u4ec0\u4e48\u3001'
         '\u5728\u610f\u4ec0\u4e48\u5c31\u591f\u4e86\u3002\n'
         '\u60f3\u5ff5\u9ad8\u5c31\u9ecf\u4e00\u70b9\uff0c\u5fc3\u75bc\u9ad8\u5c31\u5148\u7ba1\u5979\u7684\u8eab\u4f53\uff0c'
