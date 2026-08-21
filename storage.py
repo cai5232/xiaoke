@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS coreading_staging (
 CREATE INDEX IF NOT EXISTS idx_coreading_pending
  ON coreading_staging(reader_id, book_id, delivered_at, occurred_at);
 
+CREATE TABLE IF NOT EXISTS mailbox_records (
+ id TEXT PRIMARY KEY,
+ kind TEXT NOT NULL,
+ subject TEXT NOT NULL,
+ content TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'active'
+);
+CREATE INDEX IF NOT EXISTS idx_mailbox_kind_created
+ ON mailbox_records(kind, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS continuity_sessions (
  session_id TEXT PRIMARY KEY,
  created_at TEXT NOT NULL,
@@ -83,6 +94,22 @@ class TimelineStore:
    c.execute('BEGIN IMMEDIATE'); seq=c.execute('SELECT COALESCE(MAX(sequence),0)+1 FROM timeline_records').fetchone()[0]
    c.execute("INSERT INTO timeline_records(id,sequence,created_at,source,role,content) VALUES (?,?,?,?, 'event',?)",(eid,seq,utcnow(),source,str(content).strip())); c.execute('COMMIT')
   return eid
+
+ def mailbox_add(self, kind, subject, content):
+  if kind not in ('mail','regret','trash'): raise ValueError('invalid mailbox kind')
+  item_id=str(uuid.uuid4())
+  with self.db() as c:
+   c.execute('INSERT INTO mailbox_records(id,kind,subject,content,created_at,status) VALUES (?,?,?,?,?,?)',
+             (item_id,kind,str(subject).strip() or '未命名',str(content).strip(),utcnow(),'active'))
+  return item_id
+ def mailbox_list(self, kind=None, limit=100):
+  query='SELECT id,kind,subject,content,created_at,status FROM mailbox_records'
+  args=[]
+  if kind:
+   query+=' WHERE kind=?'; args.append(kind)
+  query+=' ORDER BY created_at DESC LIMIT ?'; args.append(min(max(int(limit),1),200))
+  with self.db() as c: rows=c.execute(query,args).fetchall()
+  return [dict(row) for row in rows]
 
  def save_continuity(self, session_id, baseline, seed_user, seed_assistant):
   if not str(session_id).strip(): raise ValueError('session id required')
