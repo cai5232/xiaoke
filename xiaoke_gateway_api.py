@@ -779,6 +779,8 @@ def _extract_mailbox_artifacts(reply: str):
                         if reply.strip():
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                             _save_mailbox_artifacts(store, mailbox_items)
+                    _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
+                            _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                             clean_reply, hold_items = _process_hold_blocks(clean_reply)
                             if hold_items:
                                 for h in hold_items:
@@ -932,6 +934,16 @@ def _save_mailbox_artifacts(store, artifacts):
     for item in artifacts:
         try:
             store.mailbox_add(item['kind'], item['subject'], item['content'])
+        except Exception:
+            pass
+
+def _notify_mailbox_artifacts(push_db, artifacts, session_id):
+    for item in artifacts:
+        try:
+            labels={'mail':'新邮件','regret':'新的检讨书','trash':'已放入垃圾桶'}
+            title=labels.get(item['kind'],'邮箱更新')
+            body=item.get('subject') or item.get('content','')[:60]
+            send_push_notification(push_db, session_id or 'reverie-yy', title, body, '/')
         except Exception:
             pass
 
