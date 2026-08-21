@@ -868,6 +868,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     # 替换返回内容里的 choices
                     if choices:
                         upstream_response['choices'][0]['message']['content'] = clean_reply
+                        for key in ('reasoning_content', 'thinking', 'analysis'):
+                            upstream_response['choices'][0]['message'].pop(key, None)
                     # 如果是小窝的请求，推送通知给言言
                     if source == 'reverie':
                         import re as _re
