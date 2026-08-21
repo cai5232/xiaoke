@@ -280,6 +280,20 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
+    @app.get('/internal/grudges')
+    def internal_grudges():
+        authorization = request.headers.get('Authorization', '')
+        token = authorization[7:] if authorization.startswith('Bearer ') else ''
+        if not token:
+            token = request.args.get('token', '')
+        if required_api_key and not hmac.compare_digest(token, required_api_key):
+            return jsonify({'error': 'unauthorized'}), 401
+        try:
+            limit = min(max(int(request.args.get('limit', '50')), 1), 100)
+            return jsonify({'grudges': drive_engine.recent_grudges(limit)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/internal/cron/run', methods=['GET', 'POST'])
     def cron_run():
         authorization = request.headers.get('Authorization', '')
