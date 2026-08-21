@@ -171,9 +171,23 @@ MAILBOX_PROTOCOL = """
 不要在普通聊天里解释这些标记。标记会被系统隐藏并保存到对应分类。
 """
 
+
+_HIDDEN_BLOCK_RE = re.compile(r'(?is)(?:\\[/?(?:think|thinking|analysis|reasoning)\\]|<\\/?(?:think|thinking|analysis|reasoning)>)(.*?)(?:\\[/(?:think|thinking|analysis|reasoning)\\]|</(?:think|thinking|analysis|reasoning)>)')
+_HIDDEN_OPEN_RE = re.compile(r'(?is)(?:\\[(?:think|thinking|analysis|reasoning)\\]|<(?:think|thinking|analysis|reasoning)>)')
+_HIDDEN_CLOSE_RE = re.compile(r'(?is)(?:\\[/(?:think|thinking|analysis|reasoning)\\]|</(?:think|thinking|analysis|reasoning)>)')
+
+def _strip_hidden_blocks(text: str) -> str:
+    text = str(text or '')
+    text = _HIDDEN_BLOCK_RE.sub('', text)
+    # An interrupted stream may contain an opening tag without a close tag.
+    opening = _HIDDEN_OPEN_RE.search(text)
+    if opening:
+        text = text[:opening.start()]
+    return _HIDDEN_CLOSE_RE.sub('', text).strip()
+
 def _extract_mailbox_artifacts(reply: str):
     artifacts = []
-    clean = reply
+    clean = _strip_hidden_blocks(reply)
     for kind, tag in (('mail', 'MAIL'), ('regret', 'REGRET'), ('trash', 'TRASH')):
         pattern = re.compile(r'\\[' + tag + r'\\]([\\s\\S]*?)\\[/' + tag + r'\\]', re.IGNORECASE)
         for match in pattern.finditer(reply):
@@ -788,7 +802,6 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     try:
                         for sse_event, is_done in forward_stream(clean_messages, model, request_options):
                             chunks_collected.append(sse_event)
-                            yield sse_event
                             if is_done:
                                 completed = True
                     except Exception:
@@ -800,7 +813,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                             _save_mailbox_artifacts(store, mailbox_items)
                             _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
-                            clean_reply, hold_items = _process_hold_blocks(clean_reply)
+                            clean_reply, hold_items = _process_hold_blocks(_strip_hidden_blocks(clean_reply))
                             if hold_items:
                                 for h in hold_items:
                                     try:
