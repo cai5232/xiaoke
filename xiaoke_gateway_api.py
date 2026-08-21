@@ -21,8 +21,8 @@ from window_identity import identify_window, new_session_id
 from drives import DriveEngine, prompt_block as drives_prompt_block
 
 DEFAULT_DB = Path(__file__).resolve().parent / 'data' / 'xiaoke.sqlite'
-DEFAULT_HANDOFF_RECORDS = 66
-DEFAULT_HANDOFF_CHARS = 800000
+DEFAULT_HANDOFF_RECORDS = 20
+DEFAULT_HANDOFF_CHARS = 24000
 
 
 def _push_db_path(db_path: Path) -> Path:
@@ -217,8 +217,11 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
     push_db = _push_db_path(db_path)
     _init_push_db(push_db)
     drive_engine = DriveEngine(db_path.parent / 'drives.sqlite')
-    max_records = max_handoff_records if max_handoff_records is not None else int(os.environ.get("MAX_HANDOFF_RECORDS", DEFAULT_HANDOFF_RECORDS))
-    max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
+    raw_max_records = max_handoff_records if max_handoff_records is not None else int(os.environ.get("MAX_HANDOFF_RECORDS", DEFAULT_HANDOFF_RECORDS))
+    raw_max_chars = max_handoff_chars if max_handoff_chars is not None else int(os.environ.get("MAX_HANDOFF_CHARS", DEFAULT_HANDOFF_CHARS))
+    # Keep accidental oversized deployment env values from exploding every prompt.
+    max_records = min(max(int(raw_max_records), 1), 40)
+    max_chars = min(max(int(raw_max_chars), 4000), 60000)
     required_api_key = api_key if api_key is not None else os.environ.get("XIAOKE_API_KEY", "")
 
     # ── Meta KV helpers（存 per-session turns_since_memory 计数）──────────────────
@@ -658,7 +661,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
         if user_text:
             mem_result = search_memories(user_text, max_results=4)
             if mem_result:
-                mem_search_text = mem_result
+                mem_search_text = mem_result[:3000]
 
         # ── turns_since_memory 计数 ──────────────────────────────────
         tsm_key = f'tsm:{session_id or "default"}'
@@ -684,7 +687,9 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 '请在回复末尾追加 <!--HOLD: 本轮最值得记录的信息-->。'
             )
 
-        breath_text = get_breath_memories(max_results=20) or load_memories_text(max_count=30)
+        breath_text = get_breath_memories(max_results=12) or load_memories_text(max_count=20)
+        if breath_text:
+            breath_text = breath_text[:6000]
         guidance = None
 
         # 单独拉最近的花园日志（cron source），注入system prompt
@@ -697,7 +702,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                 if content:
                     lines.append(content)
             if lines:
-                cron_text = '\n'.join(lines)
+                cron_text = '\n'.join(lines)[:1200]
 
         # ── 主动检测小窝新消息（reverie source）──────────────────────
         # 每次Kelivo请求时对比上次seen的sequence，有新的就醒目提示，没有就静默背景
@@ -712,7 +717,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     if content:
                         lines.append(f'[{role_label}] {content}')
                 if lines:
-                    reverie_text = '[小窝近期对话]\n' + '\n'.join(lines)
+                    reverie_text = '[小窝近期对话]\n' + '\n'.join(lines)[:2400]
 
         # ── 稳定段（BP1，加 cache_control）vs 动态段（不缓存）──────────
         # 稳定：原始人设 + 长期记忆（breath），几乎不变，可以缓存
@@ -763,7 +768,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             messages = injected_systems
 
         assembled, baseline, continuing = build_messages(messages, store, session_id, max_records, max_chars)
-        model = str(body.get('model') or 'claude-opus-4-6-thinking')
+        model = str(body.get('model') or os.environ.get('XIAOKE_DEFAULT_MODEL') or 'claude-sonnet-4.5')
         is_stream = body.get('stream', False)
         request_options = {key: value for key, value in body.items()
                            if key not in ('messages', 'model', 'stream')}
