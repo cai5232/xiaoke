@@ -194,7 +194,7 @@ def _split_thinking_blocks(text: str) -> tuple[str, str]:
         return ''
     visible = _HIDDEN_BLOCK_RE.sub(collect, raw)
     visible = _HIDDEN_CLOSE_RE.sub('', visible)
-    return '\\n'.join(x for x in thinking if x), visible.strip()
+    return '\n'.join(x for x in thinking if x), visible.strip()
 
 def _extract_mailbox_artifacts(reply: str):
     artifacts = []
@@ -821,7 +821,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     if completed:
                         thinking, reply = extract_stream_parts(chunks_collected)
                         tagged_thinking, reply = _split_thinking_blocks(reply)
-                        thinking = '\\n'.join(x for x in (thinking, tagged_thinking) if x)
+                        thinking = '\n'.join(x for x in (thinking, tagged_thinking) if x)
                         if reply.strip():
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                             _save_mailbox_artifacts(store, mailbox_items)
