@@ -943,7 +943,7 @@ def _notify_mailbox_artifacts(push_db, artifacts, session_id):
             labels={'mail':'新邮件','regret':'新的检讨书','trash':'已放入垃圾桶'}
             title=labels.get(item['kind'],'邮箱更新')
             body=item.get('subject') or item.get('content','')[:60]
-            send_push_notification(push_db, session_id or 'reverie-yy', title, body, '/')
+            send_push_notification(push_db, os.environ.get('REVERIE_PUSH_SESSION','reverie-yy'), title, body, '/')
         except Exception:
             pass
 
