@@ -185,7 +185,7 @@ def _mailbox_visible_piece(text: str, state: dict) -> str:
             source = source[end + len(close):]
             state['kind'] = ''
             continue
-        match = re.search(r'\\[(MAIL|REGRET|TRASH)\\]', source, re.IGNORECASE)
+        match = re.search(r'\[(MAIL|REGRET|TRASH)\]', source, re.IGNORECASE)
         if not match:
             keep = 0
             for size in range(1, min(len(source), 8) + 1):
