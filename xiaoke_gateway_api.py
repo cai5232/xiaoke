@@ -175,7 +175,7 @@ def _extract_mailbox_artifacts(reply: str):
     artifacts = []
     clean = reply
     for kind, tag in (('mail', 'MAIL'), ('regret', 'REGRET'), ('trash', 'TRASH')):
-        pattern = re.compile(r'\\[' + tag + r'\\]([\\s\\S]*?)\\[/' + tag + r'\\]', re.IGNORECASE)
+        pattern = re.compile(r'\[' + tag + r'\]([\s\S]*?)\[/' + tag + r'\]', re.IGNORECASE)
         for match in pattern.finditer(reply):
             body = match.group(1).strip()
             subject = '未命名'
