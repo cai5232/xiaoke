@@ -146,3 +146,25 @@ def extract_stream_content(sse_events: list[str]) -> str:
         except (json.JSONDecodeError, IndexError, KeyError):
             continue
     return ''.join(content_parts)
+
+
+def extract_stream_parts(sse_events: list[str]) -> tuple[str, str]:
+    """Return (thinking, visible content) from an upstream stream."""
+    thinking_parts, content_parts = [], []
+    for event_str in sse_events:
+        if not event_str.startswith('data:'):
+            continue
+        data_part = event_str[5:].strip().rstrip('\\n')
+        if data_part == '[DONE]':
+            continue
+        try:
+            obj = json.loads(data_part)
+            choices = obj.get('choices', [])
+            if not choices:
+                continue
+            delta = choices[0].get('delta', {}) or {}
+            thinking_parts.append(str(delta.get('thinking') or delta.get('reasoning_content') or ''))
+            content_parts.append(str(delta.get('content') or ''))
+        except (json.JSONDecodeError, IndexError, KeyError, TypeError):
+            continue
+    return ''.join(thinking_parts), ''.join(content_parts)
