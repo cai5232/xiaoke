@@ -125,7 +125,7 @@ def analyze_by_model(text: str) -> dict[str, float] | None:
     api_key = (os.environ.get('DRIVES_API_KEY')
                or os.environ.get('XIAOKE_UPSTREAM_KEY')
                or '').strip()
-    model = os.environ.get('DRIVES_MODEL', '').strip()
+    model = os.environ.get('DRIVES_MODEL', '[按量6] claude-sonnet-4.5 [不补]').strip()
     if not base_url or not api_key or not model:
         return None
     timeout = float(os.environ.get('DRIVES_TIMEOUT', '8'))
