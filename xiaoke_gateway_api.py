@@ -172,9 +172,9 @@ MAILBOX_PROTOCOL = """
 """
 
 
-_HIDDEN_BLOCK_RE = re.compile(r'(?is)(?:\\[/?(?:think|thinking|analysis|reasoning)\\]|<\\/?(?:think|thinking|analysis|reasoning)>)(.*?)(?:\\[/(?:think|thinking|analysis|reasoning)\\]|</(?:think|thinking|analysis|reasoning)>)')
-_HIDDEN_OPEN_RE = re.compile(r'(?is)(?:\\[(?:think|thinking|analysis|reasoning)\\]|<(?:think|thinking|analysis|reasoning)>)')
-_HIDDEN_CLOSE_RE = re.compile(r'(?is)(?:\\[/(?:think|thinking|analysis|reasoning)\\]|</(?:think|thinking|analysis|reasoning)>)')
+_HIDDEN_BLOCK_RE = re.compile(r'(?is)(?:\[/?(?:think|thinking|analysis|reasoning)\]|<\/?(?:think|thinking|analysis|reasoning)>)(.*?)(?:\[/(?:think|thinking|analysis|reasoning)\]|</(?:think|thinking|analysis|reasoning)>)')
+_HIDDEN_OPEN_RE = re.compile(r'(?is)(?:\[(?:think|thinking|analysis|reasoning)\]|<(?:think|thinking|analysis|reasoning)>)')
+_HIDDEN_CLOSE_RE = re.compile(r'(?is)(?:\[/(?:think|thinking|analysis|reasoning)\]|</(?:think|thinking|analysis|reasoning)>)')
 
 def _strip_hidden_blocks(text: str) -> str:
     text = str(text or '')
@@ -189,7 +189,7 @@ def _extract_mailbox_artifacts(reply: str):
     artifacts = []
     clean = _strip_hidden_blocks(reply)
     for kind, tag in (('mail', 'MAIL'), ('regret', 'REGRET'), ('trash', 'TRASH')):
-        pattern = re.compile(r'\\[' + tag + r'\\]([\\s\\S]*?)\\[/' + tag + r'\\]', re.IGNORECASE)
+        pattern = re.compile(r'\[' + tag + r'\]([\s\S]*?)\[/' + tag + r'\]', re.IGNORECASE)
         for match in pattern.finditer(reply):
             body = match.group(1).strip()
             subject = '未命名'
@@ -831,6 +831,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                                      'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply},
                                                   'finish_reason': 'stop'}]}
                             yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
+                            yield 'data: [DONE]\n\n'
+                        else:
                             yield 'data: [DONE]\n\n'
 
                 return Response(generate_stream(), content_type='text/event-stream',
