@@ -814,11 +814,20 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             if is_stream:
                 def generate_stream():
                     chunks_collected = []
+                    mailbox_saved = False
                     completed = False
                     try:
                         mailbox_state = {'kind': '', 'pending': ''}
                         for sse_event, is_done in forward_stream(clean_messages, model, request_options):
                             chunks_collected.append(sse_event)
+                            if not mailbox_saved:
+                                raw_so_far = extract_stream_content(chunks_collected)
+                                if any(tag in raw_so_far.upper() for tag in ('[/MAIL]', '[/REGRET]', '[/TRASH]')):
+                                    _, early_items = _extract_mailbox_artifacts(raw_so_far)
+                                    if early_items:
+                                        _save_mailbox_artifacts(store, early_items)
+                                        _notify_mailbox_artifacts(push_db, early_items, session_id)
+                                        mailbox_saved = True
                             visible_event = sse_event
                             if sse_event.startswith('data:') and sse_event[5:].strip() != '[DONE]':
                                 try:
@@ -841,8 +850,9 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                         reply = extract_stream_content(chunks_collected)
                         if reply.strip():
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
-                            _save_mailbox_artifacts(store, mailbox_items)
-                            _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
+                            if not mailbox_saved:
+                                _save_mailbox_artifacts(store, mailbox_items)
+                                _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                             clean_reply, hold_items = _process_hold_blocks(clean_reply)
                             if hold_items:
                                 for h in hold_items:
