@@ -171,6 +171,36 @@ MAILBOX_PROTOCOL = """
 不要在普通聊天里解释这些标记。标记会被系统隐藏并保存到对应分类。
 """
 
+def _mailbox_visible_piece(text: str, state: dict) -> str:
+    source = state.get('pending', '') + str(text or '')
+    state['pending'] = ''
+    output = []
+    while source:
+        kind = state.get('kind')
+        if kind:
+            close = '[/' + kind + ']'
+            end = source.upper().find(close)
+            if end < 0:
+                return ''.join(output)
+            source = source[end + len(close):]
+            state['kind'] = ''
+            continue
+        match = re.search(r'\\[(MAIL|REGRET|TRASH)\\]', source, re.IGNORECASE)
+        if not match:
+            keep = 0
+            for size in range(1, min(len(source), 8) + 1):
+                tail = source[-size:].upper()
+                if any(tag.startswith(tail) for tag in ('[MAIL]', '[REGRET]', '[TRASH]')):
+                    keep = size
+            output.append(source[:-keep] if keep else source)
+            if keep:
+                state['pending'] = source[-keep:]
+            return ''.join(output)
+        output.append(source[:match.start()])
+        state['kind'] = match.group(1).upper()
+        source = source[match.end():]
+    return ''.join(output)
+
 def _extract_mailbox_artifacts(reply: str):
     artifacts = []
     clean = reply
@@ -786,9 +816,22 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     chunks_collected = []
                     completed = False
                     try:
+                        mailbox_state = {'kind': '', 'pending': ''}
                         for sse_event, is_done in forward_stream(clean_messages, model, request_options):
                             chunks_collected.append(sse_event)
-                            yield sse_event
+                            visible_event = sse_event
+                            if sse_event.startswith('data:') and sse_event[5:].strip() != '[DONE]':
+                                try:
+                                    payload = json.loads(sse_event[5:].strip())
+                                    delta = payload.get('choices', [{}])[0].get('delta', {})
+                                    if isinstance(delta, dict) and isinstance(delta.get('content'), str):
+                                        visible = _mailbox_visible_piece(delta.get('content'), mailbox_state)
+                                        if visible != delta.get('content'):
+                                            delta['content'] = visible
+                                            visible_event = 'data: ' + json.dumps(payload, ensure_ascii=False) + '\\n\\n'
+                                except (ValueError, TypeError, KeyError, IndexError):
+                                    pass
+                            yield visible_event
                             if is_done:
                                 completed = True
                     except Exception:
