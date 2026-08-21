@@ -779,7 +779,6 @@ def _extract_mailbox_artifacts(reply: str):
                         if reply.strip():
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                             _save_mailbox_artifacts(store, mailbox_items)
-                    _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                             _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                             clean_reply, hold_items = _process_hold_blocks(clean_reply)
                             if hold_items:
@@ -812,6 +811,7 @@ def _extract_mailbox_artifacts(reply: str):
                     # 解析并处理 [HOLD] 块
                     clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                     _save_mailbox_artifacts(store, mailbox_items)
+                    _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                     clean_reply, hold_items = _process_hold_blocks(clean_reply)
                     if hold_items:
                         for h in hold_items:
