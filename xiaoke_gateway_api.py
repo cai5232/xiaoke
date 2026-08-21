@@ -827,6 +827,12 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                             if baseline and not continuing:
                                 store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, clean_reply)
 
+                            event = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
+                                     'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply},
+                                                  'finish_reason': 'stop'}]}
+                            yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\\n\\n'
+                            yield 'data: [DONE]\\n\\n'
+
                 return Response(generate_stream(), content_type='text/event-stream',
                               headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
             else:
