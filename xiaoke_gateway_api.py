@@ -741,7 +741,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
             stable_extra += '\n\n[长期记忆 / 关于言言的记忆]\n' + breath_text
 
         volatile_extra = ''
-        volatile_extra += '\\n\\n' + MAILBOX_PROTOCOL
+        volatile_extra += '\n\n' + MAILBOX_PROTOCOL
         if mem_search_text:
             volatile_extra += '\n\n[相关记忆检索结果]\n' + mem_search_text
         if guidance:
@@ -830,8 +830,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                             event = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
                                      'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply},
                                                   'finish_reason': 'stop'}]}
-                            yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\\n\\n'
-                            yield 'data: [DONE]\\n\\n'
+                            yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
+                            yield 'data: [DONE]\n\n'
 
                 return Response(generate_stream(), content_type='text/event-stream',
                               headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
