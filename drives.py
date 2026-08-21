@@ -201,6 +201,13 @@ class DriveEngine:
             created_at REAL NOT NULL,
             text TEXT NOT NULL
         )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS grudge_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT (datetime('now')),
+            drive TEXT NOT NULL,
+            trigger TEXT NOT NULL,
+            note TEXT
+        )''')
         if not conn.execute('SELECT 1 FROM drive_state WHERE id = 1').fetchone():
             now = time.time()
             initial = {name: cfg['b'] for name, cfg in DRIVES.items()}
@@ -343,10 +350,41 @@ class DriveEngine:
                 conn.close()
             except Exception:
                 pass
+            self._maybe_write_grudge(deltas, values, text)
 
         top_name = max(values, key=lambda k: values[k])
         return {'drives': values, 'deltas': deltas, 'method': method,
                 'top': (top_name, values[top_name])}
+
+    def _maybe_write_grudge(self, deltas: dict[str, float],
+                            values: dict[str, float], text: str) -> None:
+        candidates = [('jealousy', deltas.get('jealousy', 0.0), values.get('jealousy', 0.0)),
+                      ('gloom', deltas.get('gloom', 0.0), values.get('gloom', 0.0))]
+        drive, delta, value = max(candidates, key=lambda item: item[1] + item[2] * 0.08)
+        if delta < 0.8 and value < 7.0:
+            return
+        conn = self._conn()
+        last = conn.execute(
+            'SELECT note FROM grudge_log WHERE drive = ? ORDER BY id DESC LIMIT 1',
+            (drive,)).fetchone()
+        note = (text or '').strip()[:200] or 'Murmur 记下了这次情绪波动。'
+        if last and last[0] == note:
+            conn.close()
+            return
+        conn.execute(
+            'INSERT INTO grudge_log (drive, trigger, note) VALUES (?, ?, ?)',
+            (drive, DRIVES.get(drive, {}).get('z', drive), note))
+        conn.commit()
+        conn.close()
+
+    def recent_grudges(self, limit: int = 50) -> list[dict[str, Any]]:
+        conn = self._conn()
+        rows = conn.execute(
+            'SELECT created_at, drive, trigger, note FROM grudge_log '
+            'ORDER BY id DESC LIMIT ?', (limit,)).fetchall()
+        conn.close()
+        return [{'created_at': r[0], 'drive': r[1],
+                 'trigger': r[2], 'note': r[3]} for r in rows]
 
     def recent_log(self, limit: int = 20) -> list[dict[str, Any]]:
         conn = self._conn()
