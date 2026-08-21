@@ -5,6 +5,7 @@ import json
 import uuid
 import os
 import hmac
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
