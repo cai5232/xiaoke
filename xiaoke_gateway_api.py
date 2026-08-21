@@ -185,9 +185,20 @@ def _strip_hidden_blocks(text: str) -> str:
         text = text[:opening.start()]
     return _HIDDEN_CLOSE_RE.sub('', text).strip()
 
+def _split_thinking_blocks(text: str) -> tuple[str, str]:
+    """Keep model reasoning available as a separately foldable field."""
+    raw = str(text or '')
+    thinking = []
+    def collect(match):
+        thinking.append(match.group(1).strip())
+        return ''
+    visible = _HIDDEN_BLOCK_RE.sub(collect, raw)
+    visible = _HIDDEN_CLOSE_RE.sub('', visible)
+    return '\\n'.join(x for x in thinking if x), visible.strip()
+
 def _extract_mailbox_artifacts(reply: str):
     artifacts = []
-    clean = _strip_hidden_blocks(reply)
+    clean = str(reply or '')
     for kind, tag in (('mail', 'MAIL'), ('regret', 'REGRET'), ('trash', 'TRASH')):
         pattern = re.compile(r'\[' + tag + r'\]([\s\S]*?)\[/' + tag + r'\]', re.IGNORECASE)
         for match in pattern.finditer(reply):
@@ -788,7 +799,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                            if key not in ('messages', 'model', 'stream')}
 
         if has_upstream():
-            from upstream import forward_non_stream, forward_stream, extract_stream_content, request_payload
+            from upstream import forward_non_stream, forward_stream, extract_stream_content, extract_stream_parts, request_payload
 
             clean_messages = []
             for m in assembled:
@@ -808,12 +819,14 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                         return
 
                     if completed:
-                        reply = extract_stream_content(chunks_collected)
+                        thinking, reply = extract_stream_parts(chunks_collected)
+                        tagged_thinking, reply = _split_thinking_blocks(reply)
+                        thinking = '\\n'.join(x for x in (thinking, tagged_thinking) if x)
                         if reply.strip():
                             clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
                             _save_mailbox_artifacts(store, mailbox_items)
                             _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
-                            clean_reply, hold_items = _process_hold_blocks(_strip_hidden_blocks(clean_reply))
+                            clean_reply, hold_items = _process_hold_blocks(clean_reply)
                             if hold_items:
                                 for h in hold_items:
                                     try:
@@ -829,7 +842,7 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
 
                             event = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
                                      'created': int(__import__('time').time()), 'model': model,
-                                     'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply},
+                                     'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply, **({'thinking': thinking} if thinking else {})},
                                                   'finish_reason': None}]}
                             yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
                             finish = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
@@ -855,7 +868,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
 
                 if reply.strip():
                     # 解析并处理 [HOLD] 块
-                    clean_reply, mailbox_items = _extract_mailbox_artifacts(reply)
+                    thinking, visible_reply = _split_thinking_blocks(reply)
+                    clean_reply, mailbox_items = _extract_mailbox_artifacts(visible_reply)
                     _save_mailbox_artifacts(store, mailbox_items)
                     _notify_mailbox_artifacts(push_db, mailbox_items, session_id)
                     clean_reply, hold_items = _process_hold_blocks(clean_reply)
@@ -875,8 +889,8 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                     # 替换返回内容里的 choices
                     if choices:
                         upstream_response['choices'][0]['message']['content'] = clean_reply
-                        for key in ('reasoning_content', 'thinking', 'analysis'):
-                            upstream_response['choices'][0]['message'].pop(key, None)
+                        if thinking:
+                            upstream_response['choices'][0]['message']['reasoning_content'] = thinking
                     # 如果是小窝的请求，推送通知给言言
                     if source == 'reverie':
                         import re as _re
