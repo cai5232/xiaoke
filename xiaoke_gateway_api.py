@@ -828,9 +828,14 @@ def create_app(db_path: str | Path = DEFAULT_DB, max_handoff_records: int | None
                                 store.save_continuity(session_id or new_session_id(source), [r.__dict__ for r in baseline], user_text, clean_reply)
 
                             event = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
+                                     'created': int(__import__('time').time()), 'model': model,
                                      'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': clean_reply},
-                                                  'finish_reason': 'stop'}]}
+                                                  'finish_reason': None}]}
                             yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
+                            finish = {'id': 'xiaoke-sanitized', 'object': 'chat.completion.chunk',
+                                      'created': event['created'], 'model': model,
+                                      'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}]}
+                            yield 'data: ' + json.dumps(finish, ensure_ascii=False) + '\n\n'
                             yield 'data: [DONE]\n\n'
                         else:
                             yield 'data: [DONE]\n\n'
